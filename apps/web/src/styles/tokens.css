@@ -1,0 +1,72 @@
+/* Design-Tokens. Komponenten nutzen nur diese Variablen, nie feste Farben. */
+:root {
+  --font-display: 'Bricolage Grotesque', ui-rounded, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-body: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --r-l: 22px;
+  --r-m: 14px;
+  --r-s: 10px;
+  --nav-h: 64px;
+
+  --bg: #eef1f6;
+  --surface: #ffffff;
+  --surface-2: #f5f7fa;
+  --ink: #162033;
+  --ink-2: #566176;
+  --ink-3: #8a93a6;
+  --line: #dfe4ec;
+  --accent: #3f51e0;
+  --accent-soft: #e6e9fc;
+  --accent-ink: #2a37a8;
+  --on-accent: #ffffff;
+  --warn: #8f5404;
+  --warn-soft: #fcefd6;
+  --ok: #17734a;
+  --ok-soft: #dff3e8;
+  --danger: #b42318;
+  --shadow: 0 1px 2px rgba(22, 32, 51, 0.04), 0 8px 24px rgba(22, 32, 51, 0.06);
+  --shadow-lift: 0 2px 4px rgba(22, 32, 51, 0.06), 0 14px 32px rgba(22, 32, 51, 0.12);
+}
+
+:root[data-theme='dark'] {
+  --bg: #0e1220;
+  --surface: #171c2b;
+  --surface-2: #1e2436;
+  --ink: #edf0f7;
+  --ink-2: #a2aabd;
+  --ink-3: #727b90;
+  --line: #2a3145;
+  --accent: #8c9bff;
+  --accent-soft: #252c55;
+  --accent-ink: #c3cbff;
+  --on-accent: #0e1220;
+  --warn: #f2b866;
+  --warn-soft: #3a2b12;
+  --ok: #6bd3a0;
+  --ok-soft: #163427;
+  --danger: #ff8a80;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.28);
+  --shadow-lift: 0 2px 4px rgba(0, 0, 0, 0.5), 0 14px 32px rgba(0, 0, 0, 0.4);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme='auto'] {
+    --bg: #0e1220;
+    --surface: #171c2b;
+    --surface-2: #1e2436;
+    --ink: #edf0f7;
+    --ink-2: #a2aabd;
+    --ink-3: #727b90;
+    --line: #2a3145;
+    --accent: #8c9bff;
+    --accent-soft: #252c55;
+    --accent-ink: #c3cbff;
+    --on-accent: #0e1220;
+    --warn: #f2b866;
+    --warn-soft: #3a2b12;
+    --ok: #6bd3a0;
+    --ok-soft: #163427;
+    --danger: #ff8a80;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.28);
+    --shadow-lift: 0 2px 4px rgba(0, 0, 0, 0.5), 0 14px 32px rgba(0, 0, 0, 0.4);
+  }
+}

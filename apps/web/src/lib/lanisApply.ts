@@ -1,0 +1,91 @@
+import {
+  parseSubstitutions,
+  parseTimetable,
+  planImport,
+  toIsoDate,
+  type Exam,
+  type ImportItem,
+  type LanisEvent,
+  type Subject,
+} from '@study/core';
+import type { Action } from '../state/store';
+import { uid } from './format';
+
+export interface LanisResponse {
+  events?: LanisEvent[];
+  timetableHtml?: string | null;
+  substitutions?: { date: string; raw: unknown }[];
+  errors?: Record<string, string>;
+}
+
+export const LANIS_ERRORS: Record<string, string> = {
+  login_failed: 'Anmeldung bei Lanis abgelehnt. Prüfe Schulnummer, Benutzername und Passwort.',
+  lanis_unavailable: 'Lanis antwortet gerade nicht wie erwartet. Versuche es später noch einmal.',
+  bad_request: 'Bitte Schulnummer (nur Ziffern), Benutzername und Passwort eingeben.',
+  rate_limited: 'Zu viele Abrufe in kurzer Zeit. Warte ein paar Minuten und versuche es dann noch einmal.',
+  not_allowed: 'Dein Konto ist noch nicht freigegeben.',
+  unauthorized: 'Bitte melde dich neu an.',
+};
+
+/** Fehlercode aus der Antwort der Edge Function (zum Beispiel login_failed), sonst null. */
+export async function lanisErrorCode(error: unknown): Promise<string | null> {
+  const ctx = (error as { context?: Response } | null)?.context;
+  if (ctx && typeof ctx.json === 'function') {
+    try {
+      return ((await ctx.json()) as { error?: string }).error ?? null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+/** Klausur aus einem Lanis-Eintrag. Bei einer schon importierten Klausur ändert sich nur das Datum und das Fach. */
+export function buildExam(item: ImportItem, subjectId: string, subjects: Pick<Subject, 'id' | 'name'>[]): Exam {
+  if (item.existing) return { ...item.existing, date: item.lanis.date, subjectId };
+  const subject = subjects.find((s) => s.id === subjectId);
+  return {
+    id: uid(),
+    subjectId,
+    title: `Klausur ${subject?.name ?? item.lanis.abbr}`,
+    date: item.lanis.date,
+    priorityManual: null,
+    totalHoursManual: null,
+    startDaysManual: null,
+    externalId: item.lanis.externalId,
+  };
+}
+
+/**
+ * Übernimmt eine Lanis-Antwort ohne Rückfrage (automatische Aktualisierung):
+ * Stundenplan und Vertretungen ersetzen den alten Stand, neue Klausuren mit passendem Fach werden angelegt,
+ * bei bekannten Klausuren ändert sich nur ein verschobenes Datum. Eigene Werte bleiben unberührt.
+ */
+export function applyLanis(
+  data: LanisResponse,
+  ctx: { subjects: Subject[]; exams: Exam[]; dispatch: (a: Action) => void },
+): { exams: number; timetable: boolean; substitutions: boolean } {
+  const at = new Date().toISOString();
+  let timetable = false;
+  let substitutions = false;
+  let exams = 0;
+  if (data.timetableHtml) {
+    const tt = parseTimetable(data.timetableHtml);
+    if (tt.lessons.length > 0) {
+      ctx.dispatch({ type: 'setTimetable', timetable: tt, at });
+      timetable = true;
+    }
+  }
+  if (data.substitutions) {
+    ctx.dispatch({ type: 'setSubstitutions', substitutions: data.substitutions.flatMap((d) => parseSubstitutions(d.date, d.raw)), at });
+    substitutions = true;
+  }
+  if (data.events) {
+    for (const item of planImport(data.events, ctx.subjects, ctx.exams, toIsoDate(new Date()))) {
+      if (item.status === 'known' || !item.subjectId) continue;
+      ctx.dispatch({ type: 'upsertExam', exam: buildExam(item, item.subjectId, ctx.subjects) });
+      exams++;
+    }
+  }
+  return { exams, timetable, substitutions };
+}

@@ -1,0 +1,23 @@
+node_modules
+dist
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+
+# Lanis-Test: Zugangsdaten und Rohdaten nie einchecken
+scripts/lanis-test/secrets.json
+scripts/lanis-test/lanis-output.json
+
+# Vite-Zwischendateien
+*.timestamp-*.mjs
+scripts/lanis-test/lanis-timetable.html
+scripts/lanis-test/lanis-vplan-page.html
+scripts/lanis-test/lanis-vplan.json
+
+# Supabase CLI: lokale Verknüpfung
+supabase/.temp
+
+# Kopien der Edge Functions für die Tests (scripts/fn-tests)
+supabase/functions/*/zz-test-copy.ts

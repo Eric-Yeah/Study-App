@@ -24,7 +24,7 @@ import { useUserId } from '../lib/auth';
 import { formatDateShort, uid } from '../lib/format';
 import { mergeToPdf, type MergedPdf } from '../lib/mergePdf';
 import { applyPageEdits, renderThumbnails } from '../lib/pdfEdit';
-import { removeDocument, removeNoteImages, summarizeWorksheet, uploadDocument, uploadWorksheetImages } from '../lib/worksheetApi';
+import { dropImagesIfSure, removeDocument, removeNoteImages, summarizeWorksheet, uploadDocument, uploadWorksheetImages } from '../lib/worksheetApi';
 import { preparePages, type Progress } from '../lib/worksheetFiles';
 import { useStore, type LessonNote } from '../state/store';
 import { useAccess } from '../lib/access';
@@ -260,6 +260,7 @@ export function NoteUpload({ onCreated, onSettled }: { onCreated: (c: Created) =
             setProgress({ done, total, label: total > 1 ? `Zusammenfassen (Päckchen ${Math.min(done + 1, total)} von ${total})` : 'Zusammenfassen' }),
           );
           note = { ...note, title: summary.thema || note.title, summary, legibility: summary.lesbarkeit, effort };
+          await dropImagesIfSure(noteId, summary.lesbarkeit); // spart Speicher: sicher gelesene Bilder braucht nichts mehr
         } catch (e) {
           // Das PDF ist gespeichert und bleibt. Nur die Zusammenfassung fehlt, die Hashes zählen dann nicht als verarbeitet.
           await removeNoteImages(noteId).catch(() => {});

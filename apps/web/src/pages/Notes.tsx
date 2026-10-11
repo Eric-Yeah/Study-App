@@ -2,7 +2,7 @@ import { QUARTERS, folderFileName, formatBytes, groupNotesByWeek, highlightRange
 import { ChevronDown, Download, FolderDown, Search, Trash2, Upload, X } from 'lucide-react';
 import { Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { formatDateShort, formatNoteDay, formatWeekLabel } from '../lib/format';
-import { budgetUsedShare, downloadDocument, noteImagePaths, removeDocument, removeNoteImages, summarizeWorksheet, WorksheetError } from '../lib/worksheetApi';
+import { budgetUsedShare, downloadDocument, dropImagesIfSure, noteImagePaths, removeDocument, removeNoteImages, summarizeWorksheet, WorksheetError } from '../lib/worksheetApi';
 import { AutoTextarea } from '../components/AutoTextarea';
 import { Segmented } from '../components/Segmented';
 import { buildFolder, saveBlob } from '../lib/folderPdf';
@@ -119,6 +119,7 @@ function NoteCard({
         type: 'upsertNote',
         note: { ...note, title: summary.thema || note.title, summary, legibility: summary.lesbarkeit, effort },
       });
+      await dropImagesIfSure(note.id, summary.lesbarkeit);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Das genauere Lesen ist fehlgeschlagen.');
     } finally {

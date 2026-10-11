@@ -15,6 +15,7 @@ import { formatMinutes } from '../lib/format';
 import { useStore, type Theme } from '../state/store';
 import { useAccess } from '../lib/access';
 import { DeleteAccount } from '../components/DeleteAccount';
+import { StorageCleanup } from '../components/StorageCleanup';
 
 export function Settings() {
   const { state, dispatch } = useStore();
@@ -142,6 +143,8 @@ export function Settings() {
           Neuigkeiten ansehen
         </button>
       </div>
+
+      <StorageCleanup />
 
       <div className="card stack">
         <h2>Daten</h2>

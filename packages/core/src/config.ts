@@ -94,6 +94,13 @@ export const CONFIG = {
     monthlyBudgetUsd: 5,
     // Welches Modell mit welchem Effort für welche Aufgabe. Die Modell-IDs müssen unten unter `prices` stehen,
     // sonst rechnet die Kostengrenze mit dem teuersten bekannten Preis. Kein temperature, top_p oder top_k setzen.
+    // Bei "unsicher" gelesenen Blättern automatisch noch einmal mit dem stärkeren Modell lesen? Das kostet ein Vielfaches
+    // (Sonnet ist 20-mal so teuer wie Haiku) und lief bei jedem schwer lesbaren Foto. Aus: Die Notiz bleibt als "unsicher"
+    // markiert und der Knopf "Genauer lesen" macht es auf Wunsch.
+    autoEscalate: false,
+    // Bilder eines Blatts nach dem Lesen aus dem Speicher löschen, wenn die Lesbarkeit "sicher" war. Sie werden nur noch für
+    // "Genauer lesen" gebraucht, und das gibt es nur bei "unsicher". Das PDF der Notiz bleibt.
+    deleteSureImages: true,
     models: {
       text: { model: 'claude-haiku-5-5', effort: 'medium' }, // Arbeitsblatt nur aus Text
       image: { model: 'claude-haiku-5-5', effort: 'medium' }, // Arbeitsblatt mit mindestens einem Bild

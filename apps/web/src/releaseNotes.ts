@@ -12,6 +12,14 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '2026.10.11.1',
+    date: '11. Oktober 2026',
+    items: [
+      { icon: '🧹', title: 'Weniger Speicher', text: 'Die Bilder eines Arbeitsblatts löscht die App nach dem Lesen von selbst, wenn alles gut lesbar war. Zusammenfassung und PDF bleiben. Bleibt etwas „unsicher“, bleiben die Bilder für „Genauer lesen“ erhalten. Ältere Bilder räumst du unter Einstellungen → Speicher auf.' },
+      { icon: '💸', title: 'Schwer lesbare Blätter kosten weniger', text: 'Ein „unsicher“ gelesenes Blatt wird nicht mehr automatisch mit dem teuren Modell wiederholt. Du entscheidest mit „Genauer lesen“.', only: 'admin' },
+    ],
+  },
+  {
     version: '2026.10.10.6',
     date: '10. Oktober 2026',
     items: [

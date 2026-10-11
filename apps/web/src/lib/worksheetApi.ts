@@ -96,10 +96,34 @@ export async function noteImagePaths(noteId: string): Promise<string[]> {
   return (data ?? []).map((r) => r.storage_path as string);
 }
 
-/** Entfernt die Bilder einer Notiz aus dem Speicher. Die Zeilen in worksheet_files gehen mit der Notiz (cascade). */
+/** Entfernt die Bilder einer Notiz aus dem Speicher und die Zeilen dazu (die Zeilen gehen mit der Notiz auch per cascade). */
 export async function removeNoteImages(noteId: string): Promise<void> {
   const paths = await noteImagePaths(noteId);
   if (paths.length > 0) await supabase.storage.from(BUCKET).remove(paths);
+  await supabase.from('worksheet_files').delete().eq('lesson_note_id', noteId);
+}
+
+/**
+ * Löscht die Bilder einer sicher gelesenen Notiz (CONFIG.ai.deleteSureImages). Sie werden nur noch für "Genauer lesen" gebraucht,
+ * und das gibt es nur bei "unsicher". Das PDF der Notiz bleibt. Ein Fehler beim Löschen stört nichts, es wird beim Aufräumen nachgeholt.
+ */
+export async function dropImagesIfSure(noteId: string, legibility: string | null): Promise<void> {
+  if (!CONFIG.ai.deleteSureImages || legibility !== 'sicher') return;
+  await removeNoteImages(noteId).catch(() => {});
+}
+
+/** Löscht die Bilder aller sicher gelesenen Notizen, die noch welche haben (Aufräumen im Speicher). Gibt die Zahl gelöschter Bilder zurück. */
+export async function cleanupSureImages(noteIds: readonly string[]): Promise<number> {
+  let removed = 0;
+  for (const id of noteIds) {
+    const paths = await noteImagePaths(id);
+    if (paths.length === 0) continue;
+    const { error } = await supabase.storage.from(BUCKET).remove(paths);
+    if (error) continue;
+    await supabase.from('worksheet_files').delete().eq('lesson_note_id', id);
+    removed += paths.length;
+  }
+  return removed;
 }
 
 /** Lädt das zusammengefügte PDF in den privaten Speicher "documents". Gibt den Pfad zurück. */

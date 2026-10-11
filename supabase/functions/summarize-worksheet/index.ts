@@ -329,7 +329,8 @@ Deno.serve(async (req) => {
     let retried = false;
 
     // Unsicher gelesen: einmal automatisch mit dem Modell der Eskalation (stärker), außer es war schon die Eskalation.
-    if (shouldEscalate(summary.lesbarkeit, choice)) {
+    // Nur mit CONFIG.ai.autoEscalate (Standard aus, spart Kosten): sonst macht der Knopf "Genauer lesen" das auf Wunsch.
+    if (CONFIG.ai.autoEscalate && shouldEscalate(summary.lesbarkeit, choice)) {
       try {
         const stronger = escalationChoice(CONFIG.ai.models);
         summary = await ask(stronger);

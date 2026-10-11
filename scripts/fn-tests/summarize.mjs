@@ -42,6 +42,8 @@ globalThis.__cc = (_url, key, opts) => {
 const env = { ANTHROPIC_API_KEY: 'sk-test', SUPABASE_URL: 'https://x.supabase.co', SUPABASE_ANON_KEY: 'anon', SUPABASE_SERVICE_ROLE_KEY: 'service' };
 let handler; globalThis.Deno = { env: { get: (k) => env[k] }, serve: (h) => { handler = h; } };
 await import(process.env.FN_COPY);
+// Dieselbe Konfiguration wie in der Function (gleiche Moduldatei), damit der Test die Eskalation ein- und ausschalten kann
+const { CONFIG } = await import(new URL('../_shared/config.ts', 'file://' + process.env.FN_COPY));
 
 const anthropicCalls = []; let script = [];
 const reply = (text, { stop = 'end_turn', usage = { input_tokens: 100, output_tokens: 50 } } = {}) => ({ status: 200, body: { content: [{ type: 'text', text }], stop_reason: stop, usage } });
@@ -74,6 +76,15 @@ const imgBlock = anthropicCalls[0].body.messages[0].content.find((c) => c.type =
 assert.equal(imgBlock.source.type, 'base64'); assert.equal(imgBlock.source.media_type, 'image/jpeg'); assert.equal(imgBlock.source.data, Buffer.from([255, 216, 255, 1, 2, 3]).toString('base64'));
 ok('mit Bild: Haiku, Effort medium, Bild als base64 JPEG');
 
+// Standard: keine automatische Wiederholung mit Sonnet (spart Kosten), die Notiz bleibt "unsicher" und "Genauer lesen" gibt es auf Wunsch
+assert.equal(CONFIG.ai.autoEscalate, false);
+for (const [label, pages] of [['Text', [text]], ['Bild', [img]]]) {
+  reset([reply(good({ lesbarkeit: 'unsicher' }))]); [st, b] = await call({ lessonNoteId: 'note1', pages });
+  assert.equal(anthropicCalls.length, 1); assert.equal(anthropicCalls[0].body.model, HAIKU); assert.equal(b.retried, false); assert.equal(b.summary.lesbarkeit, 'unsicher');
+  ok(`unsicher bei ${label}: standardmäßig keine automatische Wiederholung mit Sonnet`);
+}
+
+CONFIG.ai.autoEscalate = true;
 for (const [label, pages] of [['Text', [text]], ['Bild', [img]]]) {
   reset([reply(good({ lesbarkeit: 'unsicher' }), { usage: { input_tokens: 1000, output_tokens: 200 } }), reply(good({ thema: 'Genauer' }), { usage: { input_tokens: 1000, output_tokens: 300 } })]);
   [st, b] = await call({ lessonNoteId: 'note1', pages });
@@ -81,7 +92,7 @@ for (const [label, pages] of [['Text', [text]], ['Bild', [img]]]) {
   assert.equal(anthropicCalls[1].body.model, SONNET); assert.deepEqual(anthropicCalls[1].body.output_config, { effort: 'medium' });
   assert.equal(b.retried, true); assert.equal(b.model, SONNET); assert.equal(b.summary.thema, 'Genauer');
   assert.equal(db.rows[HAIKU].requests, 1); assert.equal(db.rows[SONNET].requests, 1); assert.equal(db.rows[SONNET].output_tokens, 300);
-  ok(`unsicher bei ${label}: einmal automatisch mit Sonnet (medium), Verbrauch je Modell getrennt gezählt`);
+  ok(`unsicher bei ${label}: mit autoEscalate einmal mit Sonnet (medium), Verbrauch je Modell getrennt gezählt`);
 }
 
 reset([reply(good({ lesbarkeit: 'unsicher' }))]); [st, b] = await call({ lessonNoteId: 'note1', pages: [img], forceEffort: 'high' });
@@ -112,6 +123,8 @@ const realCc = globalThis.__cc;
 globalThis.__cc = (...a) => { const c = realCc(...a); const from = c.from; c.from = (t) => { const b = from(t); if (t === 'ai_log') b.insert = async () => { throw new Error('Log kaputt'); }; return b; }; return c; };
 reset([reply(good())]); [st, b] = await call({ lessonNoteId: 'note1', pages: [text] }); assert.equal(st, 200); globalThis.__cc = realCc;
 ok('ein Fehler beim Schreiben des Protokolls stört die Zusammenfassung nicht');
+
+CONFIG.ai.autoEscalate = false;
 
 // --- Sprache ---
 reset([reply(good())]); await call({ lessonNoteId: 'note-en', pages: [text] }); assert.ok(anthropicCalls[0].body.system.includes('auf Englisch unterrichtet')); ok('Fach mit Unterrichtssprache Englisch: Prompt verlangt Englisch');

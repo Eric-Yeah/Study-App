@@ -12,6 +12,20 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '2026.10.21.5',
+    date: '21. Oktober 2026',
+    items: [
+      { icon: '▶️', title: 'Jetzt lernen: ein Tipp bis zum Timer', text: 'Oben auf Heute steht das Fach, das laut Plan jetzt dran ist, mit dem Rest für heute. Ein Tipp startet den Timer, ohne vorher Fach und Länge zu wählen. Auch ein Fach aus „Heute geplant“ startet mit einem Tipp. Im Fokus ist das empfohlene Fach vorgewählt, und die Länge (15, 25, 45, 60 Minuten) wählst du mit einem Tipp.' },
+      { icon: '🔥', title: 'Serie mit Gnade und Wochenstreifen', text: 'Heute zeigt, wie viele Tage du dranbleibst, und die Woche als Streifen von Montag bis Sonntag. Ein Tag zählt ab 10 Minuten Fokus, 5 geübten Karten oder einer erledigten Aufgabe. Ein einzelner Ausfalltag bricht die Serie nicht, und Tage, die du als „fällt aus“ markierst, zählen gar nicht.' },
+      { icon: '🧠', title: 'Karten in zwei Minuten', text: 'Sind Karten fällig, startet auf Heute mit „Los“ gleich eine kurze Runde mit bis zu 10 Karten, ohne Umweg über die Karteikarten-Seite.' },
+      { icon: '➕', title: 'Schnell hinzufügen', text: 'Der Plus-Knopf oben (am Mac in der Seitenleiste, oder einfach die Taste N) öffnet ein Blatt für Aufgabe, Karte oder Arbeitsblatt, mit Fach und „Heute oder Morgen“. Nach dem Speichern bleibt es offen, so gehen mehrere Einträge schnell.' },
+      { icon: '📲', title: 'Verknüpfungen der installierten App', text: 'Hältst du das App-Symbol auf dem Home-Bildschirm gedrückt (Android, auf dem Mac im Dock), kommen „Jetzt lernen“, „Karten üben“, „Aufgabe hinzufügen“ und „Arbeitsblatt hochladen“ direkt ohne Umweg.' },
+      { icon: '✅', title: 'Aufgaben bleiben nicht mehr hängen', text: 'Was gestern offen blieb, taucht auf Heute wieder auf und lässt sich mit einem Tipp auf heute holen. Am Abend schiebt „Auf morgen schieben“ alle offenen Aufgaben weiter, und Aufgaben für morgen siehst du schon vorgemerkt.' },
+      { icon: '🌙', title: 'Tagesabschluss ab 17 Uhr', text: 'Am späten Nachmittag fasst Heute den Tag zusammen (gelernt, Karten, Aufgaben) und zeigt, was morgen ansteht. Der Check-in zur Konzentration ist kürzer: Die Energie ist ein Tipp, Schlaf und Training klappen bei Bedarf auf.' },
+      { icon: '🔔', title: 'Erinnerungen, die zum Tag passen', text: 'Der Tagesplan am Morgen nennt jetzt auch, wie viele Karten fällig sind. Am Abend (19 Uhr) erinnert eine Mitteilung ans Halten der Serie, aber nur bei einer Serie ab 3 Tagen und nur, wenn du heute noch nichts gemacht hast. Beides hängt am Schalter „Tagesplan“.' },
+    ],
+  },
+  {
     version: '2026.10.21.4',
     date: '21. Oktober 2026',
     items: [

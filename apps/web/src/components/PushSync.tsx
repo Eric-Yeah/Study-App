@@ -47,7 +47,7 @@ export function PushSync() {
     if (!prefs.on) return;
     const t = window.setTimeout(() => void run.current(), CONFIG.push.syncDelayMs);
     return () => window.clearTimeout(t);
-  }, [prefs, state.exams, state.subjects, state.sessions, state.plan, state.dayOverrides, state.topics]);
+  }, [prefs, state.exams, state.subjects, state.sessions, state.plan, state.dayOverrides, state.topics, state.tasks, state.cards]);
 
   // Beim Zurückkehren und regelmäßig, denn die Texte hängen vom Tag ab
   useEffect(() => {

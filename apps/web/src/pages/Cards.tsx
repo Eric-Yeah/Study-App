@@ -12,6 +12,7 @@ import {
   isTypable,
   newCard,
   practiceSet,
+  quickRound,
   toIsoDate,
   type Difficulty,
   type Flashcard,
@@ -19,7 +20,8 @@ import {
   type TestQuestion,
 } from '@study/core';
 import { BookOpen, Brain, CheckSquare, ChevronDown, ClipboardCheck, ListChecks, PenLine, Plus, Puzzle, Search, Trash2, X, type LucideIcon } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { CardForm } from '../components/CardForm';
 import { StudyBrowse } from '../components/cards/StudyBrowse';
 import { StudyChoice } from '../components/cards/StudyChoice';
@@ -131,6 +133,15 @@ export function Cards() {
   const [filter, setFilter] = useState<string | null>(null); // null = alle Fächer
   const [diffFilter, setDiffFilter] = useState<Difficulty | null>(null); // null = alle Stufen
   const [session, setSession] = useState<Session | null>(null);
+  const [params] = useSearchParams();
+
+  // ?runde=1 (Verknüpfung der installierten App): gleich die kurze Runde starten
+  useEffect(() => {
+    if (params.get('runde') !== '1') return;
+    const round = quickRound(state.cards, today);
+    if (round.queue.length > 0) setSession({ mode: 'review', cards: round.queue });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [adding, setAdding] = useState(false);
   const [testSize, setTestSize] = useState<(typeof TEST_SIZES)[number]>(10);
   // Liste: Suche, Auswahl zum Löschen und Ändern

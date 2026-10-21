@@ -3385,3 +3385,236 @@ a.chip {
 .sidebar .nav-link.nav-settings {
   margin-top: auto;
 }
+
+/* ---------- Alltag: Jetzt lernen, Serie, Wochenstreifen, Tagesabschluss, Schnell hinzufügen (Okt 2026) ---------- */
+.hero {
+  gap: 12px;
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.hero-kicker {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+}
+.hero-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.hero-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-size: 28px;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+.hero-clock {
+  font-size: 36px;
+  font-variant-numeric: tabular-nums;
+}
+.hero-btn {
+  min-height: 52px;
+  padding: 12px 22px;
+  font-size: 17px;
+  border-radius: 999px;
+}
+@media (max-width: 520px) {
+  .hero-btn {
+    width: 100%;
+  }
+}
+.hero .bar {
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface));
+}
+.plan-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--r-m);
+  background: var(--surface-2);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.plan-row:hover {
+  background: var(--accent-soft);
+}
+.streak-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.streak-flame {
+  color: var(--ink-3);
+}
+.streak-flame.on {
+  color: var(--warn);
+}
+.week-strip {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+.week-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.week-dot {
+  width: 100%;
+  max-width: 44px;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: var(--bw) solid var(--line-strong);
+  background: var(--surface);
+  color: var(--on-accent);
+  font-size: 14px;
+  font-weight: 700;
+}
+.week-day[data-state='done'] .week-dot {
+  background: var(--ok);
+  border-color: var(--ok);
+}
+.week-day[data-state='done'] .week-dot::after {
+  content: '✓';
+}
+.week-day[data-state='missed'] .week-dot {
+  border-style: dashed;
+  background: var(--surface-2);
+}
+.week-day[data-state='paused'] .week-dot {
+  background: var(--surface-2);
+  border-color: var(--line);
+  color: var(--ink-3);
+}
+.week-day[data-state='paused'] .week-dot::after {
+  content: '–';
+}
+.week-day[data-state='future'] .week-dot {
+  border-color: var(--line);
+}
+.week-day[data-state='today'] .week-dot,
+.week-day[aria-current='date'] .week-dot {
+  border-color: var(--accent);
+  border-width: 2px;
+}
+.week-label {
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.week-day[aria-current='date'] .week-label {
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+.wrap-up {
+  background: var(--surface-2);
+}
+.wrap-great {
+  background: var(--ok-soft);
+  border-color: var(--ok);
+}
+.wrap-good,
+.wrap-some {
+  background: var(--accent-soft);
+}
+.focus-presets {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Schnell hinzufügen: Knopf in Kopfzeile und Seitenleiste, Blatt mit Eingabe */
+.quick-open {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.topbar .quick-open {
+  margin-left: auto;
+}
+.topbar .quick-open + .topbar-settings {
+  margin-left: 4px;
+}
+.sidebar .quick-open {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: var(--r-m);
+  justify-content: flex-start;
+}
+.quick-open kbd {
+  margin-left: auto;
+  font: inherit;
+  font-size: 12px;
+  opacity: 0.8;
+}
+@media (min-width: 768px) and (max-width: 1099px) {
+  .sidebar .quick-open {
+    flex-direction: column;
+    gap: 2px;
+    font-size: 11px;
+    padding: 10px 4px;
+    justify-content: center;
+  }
+  .sidebar .quick-open kbd {
+    display: none;
+  }
+}
+.quick-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(10, 14, 28, 0.5);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.quick-sheet {
+  width: min(520px, 100%);
+  max-height: 92vh;
+  overflow: auto;
+  background: var(--surface);
+  border: var(--bw) solid var(--line);
+  border-radius: var(--r-l) var(--r-l) 0 0;
+  padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px));
+  box-shadow: var(--shadow-lift);
+}
+@media (min-width: 768px) {
+  .quick-backdrop {
+    align-items: center;
+  }
+  .quick-sheet {
+    border-radius: var(--r-l);
+    padding-bottom: 18px;
+  }
+}

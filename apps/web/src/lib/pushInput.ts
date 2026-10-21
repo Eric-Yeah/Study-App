@@ -1,9 +1,9 @@
 import { CONFIG, addDays, toIsoDate, type PushDay, type PushExam } from '@study/core';
-import { blocksForDate, combinedPlan, examsWithPlans, learnedForExam, realityFor, upcoming } from '../state/selectors';
+import { blocksForDate, cardRound, combinedPlan, examsWithPlans, learnedForExam, realityFor, streakFor, upcoming } from '../state/selectors';
 import type { AppState } from '../state/store';
 
-/** Was die Erinnerungen aus dem Plan brauchen: die Blöcke der nächsten Tage und der Stand der kommenden Klausuren. */
-export function pushInputFrom(state: AppState, now: Date): { today: string; days: PushDay[]; exams: PushExam[] } {
+/** Was die Erinnerungen aus dem Plan brauchen: die Blöcke der nächsten Tage, der Stand der kommenden Klausuren, fällige Karten und die Serie. */
+export function pushInputFrom(state: AppState, now: Date): { today: string; days: PushDay[]; exams: PushExam[]; cardsDue: number; streak: { current: number; todayDone: boolean } } {
   const today = toIsoDate(now);
   const list = examsWithPlans(state, now);
   const plan = combinedPlan(state, list, now);
@@ -25,5 +25,6 @@ export function pushInputFrom(state: AppState, now: Date): { today: string; days
       behind: reality.status === 'behind' || reality.status === 'far_behind',
     };
   });
-  return { today, days, exams };
+  const streak = streakFor(state, now);
+  return { today, days, exams, cardsDue: cardRound(state, now).queue.length, streak: { current: streak.current, todayDone: streak.todayDone } };
 }

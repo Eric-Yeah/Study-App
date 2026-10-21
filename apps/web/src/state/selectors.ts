@@ -1,17 +1,26 @@
 import {
+  activeDaysOf,
   addDays,
+  carriedTasks,
   expectedMinutesBeforeToday,
   latestLoadRatio,
   manualTrainingLoad,
   planAll,
   planExam,
   plannedMinutesOn,
+  quickRound,
   realityCheck,
+  recommendFocus,
+  streakOf,
   toIsoDate,
+  weekStrip,
   type CombinedPlan,
   type Exam,
   type ExamPlan,
+  type FocusRecommendation,
+  type QuickRound,
   type RealityCheck,
+  type StreakResult,
   type Subject,
   type WeekData,
 } from '@study/core';
@@ -204,3 +213,72 @@ export function weekReviewData(state: AppState, anyDayOfWeek: string, today = ne
     exams: state.exams.map((e) => ({ date: e.date, title: e.title || state.subjects.find((s) => s.id === e.subjectId)?.name || 'Klausur', subjectId: e.subjectId })),
   };
 }
+
+/** Fokuszeit, geübte Karten und erledigte Aufgaben je Tag, daraus die Tage mit Aktivität (Serie). */
+export function activeDaysFor(state: AppState): { active: Set<string>; learnedByDate: Record<string, number>; cardsByDate: Record<string, number>; tasksDoneByDate: Record<string, number> } {
+  const learnedByDate: Record<string, number> = {};
+  for (const s of state.sessions) {
+    const d = toIsoDate(new Date(s.endedAt));
+    learnedByDate[d] = (learnedByDate[d] ?? 0) + s.minutes;
+  }
+  const cardsByDate: Record<string, number> = {};
+  for (const c of state.cards) if (c.lastReviewed) cardsByDate[c.lastReviewed] = (cardsByDate[c.lastReviewed] ?? 0) + 1;
+  const tasksDoneByDate: Record<string, number> = {};
+  for (const t of state.tasks) if (t.done) tasksDoneByDate[t.date] = (tasksDoneByDate[t.date] ?? 0) + 1;
+  return { active: activeDaysOf({ learnedByDate, cardsByDate, tasksDoneByDate }), learnedByDate, cardsByDate, tasksDoneByDate };
+}
+
+/** Tage, die der Nutzer als "fällt aus" markiert hat: sie brechen die Serie nicht. */
+export const pausedDaysOf = (state: AppState): Set<string> => new Set(state.dayOverrides.filter((o) => o.capacityMin === 0).map((o) => o.date));
+
+export function streakFor(state: AppState, today = new Date()): StreakResult {
+  return streakOf({ today: toIsoDate(today), activeDays: activeDaysFor(state).active, pausedDays: pausedDaysOf(state) });
+}
+
+/** Montag bis Sonntag der laufenden Woche für den Wochenstreifen auf Heute. */
+export function stripFor(state: AppState, list: ExamWithPlan[], today = new Date()) {
+  const iso = toIsoDate(today);
+  const a = activeDaysFor(state);
+  const first = new Date(today.getFullYear(), today.getMonth(), today.getDate() - ((today.getDay() + 6) % 7));
+  const plannedByDate: Record<string, number> = {};
+  for (let i = 0; i < 7; i++) {
+    const date = toIsoDate(new Date(first.getFullYear(), first.getMonth(), first.getDate() + i));
+    const min = list.filter((x) => x.plan.hasPlan).reduce((s, x) => s + plannedMinutesOn(x.plan, x.exam.date, date), 0);
+    if (min > 0) plannedByDate[date] = min;
+  }
+  return weekStrip({ today: iso, activeDays: a.active, pausedDays: pausedDaysOf(state), learnedByDate: a.learnedByDate, plannedByDate });
+}
+
+/** Welches Fach jetzt dran ist (Tagesplan, Rest nach der heute gelernten Zeit, siehe recommendFocus). */
+export function focusRecommendation(
+  state: AppState,
+  list: ExamWithPlan[],
+  plan: CombinedPlan,
+  lastSubjectId: string | null,
+  today = new Date(),
+): FocusRecommendation {
+  const iso = toIsoDate(today);
+  const learnedBySubject: Record<string, number> = {};
+  for (const s of state.sessions) {
+    if (s.subjectId && toIsoDate(new Date(s.endedAt)) === iso) learnedBySubject[s.subjectId] = (learnedBySubject[s.subjectId] ?? 0) + s.minutes;
+  }
+  const allowed = new Set(state.subjects.filter((s) => s.status !== 'dropped' || s.isAdvanced || s.isExamSubject).map((s) => s.id));
+  return recommendFocus({
+    blocks: blocksForDate(plan, list, iso).map((b) => ({ subjectId: b.item.subject.id, examId: b.item.exam.id, minutes: b.minutes })),
+    learnedBySubject,
+    exams: list.map((x) => ({
+      examId: x.exam.id,
+      subjectId: x.subject.id,
+      daysLeft: x.plan.daysLeft,
+      hasPlan: x.plan.hasPlan && x.plan.totalHours.value > 0,
+      behind: ['behind', 'far_behind'].includes(realityFor(state, x, today).status),
+    })),
+    lastSubjectId,
+    allowed,
+  });
+}
+
+export const cardRound = (state: AppState, today = new Date()): QuickRound => quickRound(state.cards, toIsoDate(today));
+
+/** Offene Aufgaben der letzten Tage, die auf Heute noch einmal auftauchen. */
+export const carriedOver = (state: AppState, today = new Date()) => carriedTasks(state.tasks, toIsoDate(today));

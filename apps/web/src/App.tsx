@@ -30,6 +30,8 @@ import { Settings } from './pages/Settings';
 import { Review } from './pages/Review';
 import { Subjects } from './pages/Subjects';
 import { Today } from './pages/Today';
+import { StartNow } from './pages/StartNow';
+import { QuickAddButton, QuickAddProvider, QuickAddRoute } from './components/QuickAdd';
 import { NewPassword } from './pages/NewPassword';
 import { SplashScreen } from './components/SplashScreen';
 import { AccountGate } from './components/AccountGate';
@@ -73,11 +75,13 @@ function Layout() {
           <img src={LOGO} alt="" width={30} height={30} />
           Study App
         </div>
+        <QuickAddButton withKey />
         <NavItems withSettings />
       </nav>
       <header className="topbar">
         <img src={LOGO} alt="" width={28} height={28} />
         <span>Study App</span>
+        <QuickAddButton />
         <Link
           to={SETTINGS_AREA.to}
           className={`topbar-settings${inSettings ? ' active' : ''}`}
@@ -134,10 +138,13 @@ export function App() {
       <AuthGate>
       <TimerProvider>
         <HashRouter>
+          <QuickAddProvider>
           <Routes>
             <Route path="/start" element={<StartGate />} />
             <Route element={<Layout />}>
               <Route index element={<Today />} />
+              <Route path="jetzt" element={<StartNow />} />
+              <Route path="neu" element={<QuickAddRoute />} />
               <Route path="fokus" element={<Focus />} />
               <Route path="plan" element={<Plan />} />
               <Route path="notizen" element={<Notes />} />
@@ -163,6 +170,7 @@ export function App() {
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>
+          </QuickAddProvider>
         </HashRouter>
       </TimerProvider>
       </AuthGate>

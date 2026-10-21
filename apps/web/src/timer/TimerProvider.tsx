@@ -43,6 +43,8 @@ interface TimerApi {
   progress: number;
   synced: boolean;
   start: () => void;
+  /** Ein Tipp: Fokus-Phase mit diesem Fach beginnen (auch aus einer Pause heraus). Läuft schon eine Fokus-Phase, bleibt sie. */
+  startFocus: (subjectId: string | null) => void;
   pause: () => void;
   reset: () => void;
   skip: () => void;
@@ -190,6 +192,29 @@ export function TimerProvider({ children }: { children: ReactNode }) {
         if (t.status === 'running') return;
         setNow(Date.now());
         commit({ ...t, status: 'running', startedAt: Date.now(), runId: t.runId ?? uid() });
+      },
+      startFocus: (subjectId) => {
+        const t = timerRef.current;
+        if (t.status === 'running' && t.phase === 'focus') return;
+        setNow(Date.now());
+        if (t.phase === 'focus' && t.status === 'paused') {
+          if (subjectId === null || subjectId === t.subjectId) {
+            commit({ ...t, status: 'running', startedAt: Date.now(), runId: t.runId ?? uid() });
+            return;
+          }
+          recordFocus(t, Date.now()); // angefangene Zeit gehört noch zum alten Fach
+        }
+        // Aus einer Pause oder dem Ruhezustand: frische Fokus-Phase
+        commit({
+          ...t,
+          phase: 'focus',
+          subjectId: subjectId ?? t.subjectId,
+          durationMs: phaseMs('focus', app.timer),
+          status: 'running',
+          startedAt: Date.now(),
+          elapsedMs: 0,
+          runId: uid(),
+        });
       },
       pause: () => {
         const t = timerRef.current;

@@ -30,5 +30,59 @@
   "categories": [
     "education",
     "productivity"
+  ],
+  "shortcuts": [
+    {
+      "name": "Jetzt lernen",
+      "short_name": "Lernen",
+      "description": "Startet den Fokus-Timer mit dem Fach, das laut Plan dran ist",
+      "url": "./#/jetzt",
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Karten üben",
+      "short_name": "Karten",
+      "description": "Kurze Runde mit den fälligen Karteikarten",
+      "url": "./#/karten?runde=1",
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Aufgabe hinzufügen",
+      "short_name": "Aufgabe",
+      "description": "Schnell eine Aufgabe eintragen",
+      "url": "./#/neu",
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Arbeitsblatt hochladen",
+      "short_name": "Blatt",
+      "description": "Fotos oder PDF vom Arbeitsblatt ablegen",
+      "url": "./#/neu?was=blatt",
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
   ]
 }

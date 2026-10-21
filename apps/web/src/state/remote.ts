@@ -631,6 +631,9 @@ export async function persist(action: Action, next: AppState, userId: string): P
       if (t) ok(await supabase.from('tasks').update({ done: t.done }).eq('id', t.id));
       return;
     }
+    case 'moveTasks':
+      if (action.ids.length > 0) ok(await supabase.from('tasks').update({ date: action.date }).in('id', action.ids));
+      return;
     case 'deleteTask':
       ok(await supabase.from('tasks').delete().eq('id', action.id));
       return;

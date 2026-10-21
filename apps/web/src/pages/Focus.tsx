@@ -1,10 +1,10 @@
-import { toIsoDate } from '@study/core';
+import { CONFIG, toIsoDate } from '@study/core';
 import { Pause, Play, RotateCcw, SkipForward } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { PlainSlider } from '../components/PlainSlider';
 import { ProgressRing } from '../components/ProgressRing';
 import { formatClock, formatMinutes } from '../lib/format';
-import { learnedMinutesOn } from '../state/selectors';
+import { combinedPlan, examsWithPlans, focusRecommendation, learnedMinutesOn } from '../state/selectors';
 import { useStore } from '../state/store';
 import { useTimer } from '../timer/TimerProvider';
 import { PHASE_LABELS } from '../timer/types';
@@ -17,6 +17,21 @@ export function Focus() {
   const running = t.status === 'running';
   const learned = learnedMinutesOn(state.sessions, toIsoDate(new Date()));
   const round = (t.completedFocus % state.timer.sessionsUntilLongBreak) + (t.phase === 'focus' ? 1 : 0);
+  const now = new Date();
+  const list = examsWithPlans(state, now);
+  const rec = focusRecommendation(state, list, combinedPlan(state, list, now), t.subjectId, now);
+  const recommended = rec.reason === 'planned' || rec.reason === 'behind' || rec.reason === 'next_exam' ? rec.subjectId : null;
+  const idleFocus = t.status === 'idle' && t.phase === 'focus';
+
+  // Ohne Fach zählt die Lernzeit für keine Klausur: das empfohlene Fach vorwählen (einmal beim Öffnen)
+  const preselected = useRef(false);
+  useEffect(() => {
+    if (preselected.current) return;
+    preselected.current = true;
+    const valid = t.subjectId !== null && subjects.some((s) => s.id === t.subjectId);
+    if (!valid && idleFocus && recommended) timer.setSubject(recommended);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Leertaste startet und pausiert den Timer (außer beim Tippen).
   useEffect(() => {
@@ -45,9 +60,21 @@ export function Focus() {
             <button key={s.id} type="button" className="chip" aria-pressed={t.subjectId === s.id} onClick={() => timer.setSubject(s.id)}>
               <span className="dot" style={{ background: s.color }} />
               {s.name}
+              {s.id === recommended && <span className="hint"> · dran</span>}
             </button>
           ))}
         </div>
+        {idleFocus && (
+          <div className="focus-presets" role="group" aria-label="Länge der Konzentrationsphase">
+            <span className="hint">Länge</span>
+            {CONFIG.daily.focusPresets.map((m) => (
+              <button key={m} type="button" className="chip" aria-pressed={state.timer.focusMin === m} onClick={() => dispatch({ type: 'setTimer', timer: { focusMin: m } })}>
+                {m} min
+              </button>
+            ))}
+          </div>
+        )}
+        {t.subjectId === null && idleFocus && <p className="hint">Ohne Fach zählt die Zeit für keine Klausur. Wähle oben ein Fach.</p>}
         <ProgressRing progress={timer.progress} size={260}>
           <span className="big-num" style={{ fontSize: 56 }} aria-live="off">
             {formatClock(timer.remainingMs)}

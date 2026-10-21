@@ -212,6 +212,7 @@ export type Action =
   | { type: 'deleteTopic'; id: string }
   | { type: 'addTask'; task: Task }
   | { type: 'toggleTask'; id: string }
+  | { type: 'moveTasks'; ids: string[]; date: string }
   | { type: 'deleteTask'; id: string }
   | { type: 'reset' };
 
@@ -341,6 +342,8 @@ export function reducer(state: AppState, action: Action): AppState {
       return { ...state, tasks: [...state.tasks, action.task] };
     case 'toggleTask':
       return { ...state, tasks: state.tasks.map((t) => (t.id === action.id ? { ...t, done: !t.done } : t)) };
+    case 'moveTasks':
+      return { ...state, tasks: state.tasks.map((t) => (action.ids.includes(t.id) ? { ...t, date: action.date } : t)) };
     case 'deleteTask':
       return { ...state, tasks: state.tasks.filter((t) => t.id !== action.id) };
     case 'reset':

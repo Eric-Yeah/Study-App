@@ -305,8 +305,9 @@ const listsOf = (n: LessonNote): Record<ListKey, string> => ({
 function NotesTab() {
   const { state } = useStore();
   const today = toIsoDate(new Date());
+  const [params] = useSearchParams();
 
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(() => params.get('neu') === '1'); // ?neu=1: aus "Schnell hinzufügen" gleich das Hochladen öffnen
   const [fresh, setFresh] = useState<string | null>(null);
   const [created, setCreated] = useState<Created | null>(null);
   const access = useAccess();

@@ -1,4 +1,5 @@
 import { CONFIG, concentration, toIsoDate, type ConcentrationTip, type LoadStatus } from '@study/core';
+import { useState } from 'react';
 import { Segmented } from './Segmented';
 import { formatMinutes, formatNumber } from '../lib/format';
 import { checkinFor, learnedMinutesOn, loadRatioOn, sleepOn, trainingLoadOn, trainingOn } from '../state/selectors';
@@ -38,6 +39,16 @@ const LOAD_TEXT: Record<LoadStatus, string> = {
 };
 const RPE_VALUES = Array.from({ length: 10 }, (_, i) => i + 1);
 
+const OPEN_KEY = 'study-concentration-open';
+
+function readOpen(): boolean {
+  try {
+    return localStorage.getItem(OPEN_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
 /** Konzentrationsscore: wie viel konzentrierte Lernzeit heute sinnvoll ist. Eine Empfehlung, keine Sperre. */
 export function ConcentrationCard({ plannedMin }: { plannedMin: number }) {
   const { state, dispatch } = useStore();
@@ -59,6 +70,21 @@ export function ConcentrationCard({ plannedMin }: { plannedMin: number }) {
     learnedMin: learned,
     plannedMin,
   });
+
+  // Mini-Check-in: nur die Energie ist immer sichtbar (ein Tipp), Schlaf, Training und 7:28 klappen auf
+  const [open, setOpen] = useState(readOpen);
+  const toggle = () => {
+    setOpen(!open);
+    try {
+      localStorage.setItem(OPEN_KEY, open ? '0' : '1');
+    } catch {
+      /* ohne Speicher bleibt es bei dieser Sitzung */
+    }
+  };
+  const summary = [
+    sleep.hours !== null ? `Schlaf ${hoursLabel(sleep.hours)}` : 'Schlaf offen',
+    training.source === null ? 'Training offen' : (training.sessions ?? 0) === 0 ? 'kein Training' : `Training ${training.minutes ?? 0} min`,
+  ].join(' · ');
 
   const set = (patch: Partial<Checkin>) => dispatch({ type: 'setCheckin', checkin: { ...checkin, ...patch } });
   const trainChoice = checkin.trainingSessions === null ? '' : String(Math.min(2, checkin.trainingSessions));
@@ -97,6 +123,12 @@ export function ConcentrationCard({ plannedMin }: { plannedMin: number }) {
         />
       </div>
 
+      <button type="button" className="link-btn" style={{ alignSelf: 'flex-start' }} aria-expanded={open} onClick={toggle}>
+        {open ? 'Schlaf und Training ausblenden' : `Schlaf und Training angeben (${summary})`}
+      </button>
+
+      {open && (
+      <>
       {sleep.source === 'overload' ? (
         <p className="hint">Schlaf aus Overload: {hoursLabel(sleep.hours ?? 0)}.</p>
       ) : (
@@ -202,6 +234,8 @@ export function ConcentrationCard({ plannedMin }: { plannedMin: number }) {
       ) : ratio.known ? (
         <p className="hint">Das 7:28-Verhältnis zeigt Overload erst nach etwa 14 Tagen mit Einheiten. Bis dahin zählt nur das Training von heute.</p>
       ) : null}
+      </>
+      )}
     </div>
   );
 }

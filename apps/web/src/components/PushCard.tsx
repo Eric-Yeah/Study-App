@@ -96,7 +96,7 @@ export function PushCard() {
             <div className="stack" style={{ gap: 12 }}>
               <div className="push-row">
                 <label className="row" style={{ gap: 8, alignItems: "center" }}>
-                  <input type="checkbox" checked={prefs.plan} onChange={(e) => set({ plan: e.target.checked })} /> Tagesplan am Morgen
+                  <input type="checkbox" checked={prefs.plan} onChange={(e) => set({ plan: e.target.checked })} /> Tagesplan am Morgen (abends 19 Uhr dazu: Serie halten, ab {CONFIG.daily.streakNudgeMinDays} Tagen)
                 </label>
                 <input
                   className="input push-time"

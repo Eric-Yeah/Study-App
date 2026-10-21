@@ -245,6 +245,16 @@ textarea {
 .btn:hover {
   background: var(--surface-2);
 }
+.btn:disabled,
+.chip:disabled,
+.diff-pill:disabled,
+.link-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: none;
+  transform: none;
+  box-shadow: none;
+}
 .btn-primary {
   background: var(--accent);
   border-color: var(--accent);
@@ -1264,6 +1274,23 @@ select.input.agenda-select {
   .check {
     width: 28px;
     height: 28px;
+    position: relative;
+  }
+  /* Unsichtbare Tippfläche von 44 px um den kleinen Kreis */
+  .check::after {
+    content: '';
+    position: absolute;
+    inset: -8px;
+  }
+  .diff-pill,
+  .day-adjust,
+  .note-week-head,
+  .link-btn {
+    min-height: 44px;
+  }
+  .link-btn {
+    display: inline-flex;
+    align-items: center;
   }
 }
 button,
@@ -1289,7 +1316,8 @@ label {
   font-weight: 600;
 }
 .bottom-nav {
-  grid-template-columns: repeat(6, 1fr);
+  /* "Einstellungen" ist das längste Wort und wird sonst auf schmalen Handys abgeschnitten */
+  grid-template-columns: repeat(5, 1fr) 1.4fr;
 }
 .note-filter {
   flex-wrap: nowrap;

@@ -64,7 +64,9 @@ export function UpdateManager() {
     const id = window.setInterval(() => {
       const el = document.activeElement;
       const typing = el instanceof HTMLElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName);
-      if (!typing && !SKIP_ROUTES.test(pathname)) reloadInto(available);
+      // data-no-reload: Seiten mit Entwurf im Speicher (Blatt hochladen, Lernrunde der Karten) lädt die App nicht von selbst neu
+      const guarded = document.querySelector('[data-no-reload]') !== null;
+      if (!typing && !guarded && !SKIP_ROUTES.test(pathname)) reloadInto(available);
     }, 1500);
     return () => window.clearInterval(id);
   }, [available, pathname]);

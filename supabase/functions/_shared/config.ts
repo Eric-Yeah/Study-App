@@ -214,6 +214,28 @@ export const CONFIG = {
     sportMax: 3, // so viele Sportkurse lassen sich einbringen
     assumption: 8, // Annahme in Punkten für Kurse ohne eigene Zahl, wenn auch keine Note am Fach steht
   },
+  grades: {
+    // Einzelnoten und Kursnote. Wie Lehrkräfte Klausuren und sonstige Leistungen gewichten, regelt die Schule und die Lehrkraft:
+    // das Verhältnis ist darum je Fach einstellbar, dies ist nur der Startwert.
+    writtenShare: 50, // Anteil der Klausuren an der Kursnote in Prozent
+    shareStep: 5,
+    weightMin: 0.5, // Gewicht einer einzelnen Note innerhalb ihrer Gruppe
+    weightMax: 5,
+    weightStep: 0.5,
+    trendWindow: 3, // so viele letzte Noten gegen den Rest für den Trend
+    trendMin: 1, // so viele Punkte Unterschied sind ein Trend
+    maxPerSubject: 200, // Grenze der Einträge je Fach (Schutz vor Unsinn)
+    pendingExamDays: 120, // vergangene Klausuren ohne Note werden so lange angeboten
+    kinds: {
+      exam: { label: 'Klausur', group: 'written', weight: 1 },
+      oral: { label: 'Mündliche Mitarbeit', group: 'other', weight: 1 },
+      test: { label: 'Test', group: 'other', weight: 1 },
+      presentation: { label: 'Referat / Präsentation', group: 'other', weight: 1 },
+      homework: { label: 'Hausaufgabe / Protokoll', group: 'other', weight: 0.5 },
+      project: { label: 'Projekt / Portfolio', group: 'other', weight: 1 },
+      other: { label: 'Sonstiges', group: 'other', weight: 1 },
+    },
+  },
   access: {
     // Konten für Freunde: Freigabe durch den Admin, KI pro Funktion, gemeinsamer Topf der Freunde (Betrag in app_settings)
     friendsBudgetUsd: 3, // Standard des gemeinsamen Topfs, im Admin-Protokoll einstellbar

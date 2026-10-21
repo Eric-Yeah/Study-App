@@ -1,4 +1,4 @@
-import { AI_FEATURES, CONFIG, readAccess, type AccountAccess, readAbiturPlan, emptyPlan, sanitizeStyle, type StyleRecord, isLanguage, isQuarter, isLevel, readLessons, readPracticeContent, readPracticeMeta, readStoredGrading, readTeacherTasks, type ExamReview, type PracticeRecord, type SubjectRubric, toDifficulty, type Flashcard, type Effort, type Exam, Legibility, PlanSettings, Role, Stage, Subject, SubjectStatus, SubjectType, SubstitutionEntry, Timetable, WorksheetSummary } from '@study/core';
+import { AI_FEATURES, clampPoints, clampWeight, defaultWeight, isGradeKind, readGradeSettings, type GradeEntry, CONFIG, readAccess, type AccountAccess, readAbiturPlan, emptyPlan, sanitizeStyle, type StyleRecord, isLanguage, isQuarter, isLevel, readLessons, readPracticeContent, readPracticeMeta, readStoredGrading, readTeacherTasks, type ExamReview, type PracticeRecord, type SubjectRubric, toDifficulty, type Flashcard, type Effort, type Exam, Legibility, PlanSettings, Role, Stage, Subject, SubjectStatus, SubjectType, SubstitutionEntry, Timetable, WorksheetSummary } from '@study/core';
 import { supabase } from '../lib/supabase';
 import type { Action, AppState, Checkin, DayOverride, FitnessDay, FocusSession, LessonNote, Task, Topic } from './store';
 
@@ -9,7 +9,7 @@ import type { Action, AppState, Checkin, DayOverride, FitnessDay, FocusSession, 
 
 export type RemoteData = Pick<
   AppState,
-  'onboarded' | 'profile' | 'subjects' | 'exams' | 'plan' | 'timer' | 'sessions' | 'tasks' | 'checkins' | 'fitness' | 'dayOverrides' | 'topics' | 'timetable' | 'timetableAt' | 'substitutions' | 'substitutionsAt' | 'notes' | 'cards' | 'examReviews' | 'rubrics' | 'practiceExams' | 'abiturPlan' | 'taskStyles' | 'account'
+  'onboarded' | 'profile' | 'subjects' | 'exams' | 'plan' | 'timer' | 'sessions' | 'tasks' | 'checkins' | 'fitness' | 'dayOverrides' | 'topics' | 'timetable' | 'timetableAt' | 'substitutions' | 'substitutionsAt' | 'notes' | 'cards' | 'examReviews' | 'rubrics' | 'practiceExams' | 'abiturPlan' | 'grades' | 'gradeSettings' | 'taskStyles' | 'account'
 >;
 
 function ok<T extends { error: { message: string } | null }>(res: T): T {
@@ -79,6 +79,19 @@ const checkinRow = (userId: string, c: Checkin) => ({
   training_sessions: c.trainingSessions,
   training_minutes: c.trainingMinutes,
   training_rpe: c.trainingRpe,
+});
+
+const gradeRow = (userId: string, g: GradeEntry) => ({
+  id: g.id,
+  user_id: userId,
+  subject_id: g.subjectId,
+  exam_id: g.examId,
+  quarter: g.quarter,
+  date: g.date,
+  kind: g.kind,
+  title: g.title.slice(0, 120),
+  points: clampPoints(g.points),
+  weight: clampWeight(g.weight),
 });
 
 const overrideRow = (userId: string, o: DayOverride) => ({ user_id: userId, date: o.date, capacity_min: o.capacityMin });
@@ -219,7 +232,7 @@ async function writeAll(userId: string, s: AppState) {
 const SYNC_TABLES = [
   'profiles', 'subjects', 'exams', 'plan_settings', 'timer_settings', 'focus_sessions', 'tasks',
   'daily_checkins', 'day_overrides', 'exam_topics', 'lanis_snapshots', 'fitness_daily', 'lesson_notes', 'flashcards',
-  'exam_reviews', 'subject_rubrics', 'practice_exams', 'abitur_plans', 'task_styles', 'accounts',
+  'exam_reviews', 'subject_rubrics', 'practice_exams', 'abitur_plans', 'grades', 'grade_settings', 'task_styles', 'accounts',
 ] as const;
 
 /**
@@ -250,7 +263,7 @@ export async function loadRemote(
   defaults: RemoteData,
   local: AppState | null,
 ): Promise<{ data: RemoteData; imported: boolean }> {
-  const [p, s, e, pl, ts, f, k, ci, fi, ov, tp, ls, ln, fc, er, sr, pe, ap, ts2, acc] = await Promise.all([
+  const [p, s, e, pl, ts, f, k, ci, fi, ov, tp, ls, ln, fc, er, sr, pe, ap, ts2, acc, gr, gs] = await Promise.all([
     supabase.from('profiles').select('*').eq('user_id', userId).maybeSingle(),
     supabase.from('subjects').select('*'),
     supabase.from('exams').select('*'),
@@ -275,6 +288,8 @@ export async function loadRemote(
     supabase.from('abitur_plans').select('data').eq('user_id', userId).maybeSingle(),
     supabase.from('task_styles').select('*').order('created_at', { ascending: false }),
     supabase.from('accounts').select('status, is_admin, ai_features').eq('user_id', userId).maybeSingle(),
+    supabase.from('grades').select('*').order('date', { ascending: false }),
+    supabase.from('grade_settings').select('data').eq('user_id', userId).maybeSingle(),
   ]);
   for (const r of [p, s, e, pl, ts, f, k]) ok(r);
 
@@ -364,6 +379,24 @@ export async function loadRemote(
     rubrics: [],
     practiceExams: [],
     abiturPlan: ap.error ? emptyPlan() : readAbiturPlan(ap.data?.data),
+    // Fehlt die Migration für die Noten noch, startet die App trotzdem (ohne Noten).
+    grades: (gr.error ? [] : gr.data ?? []).flatMap((r): GradeEntry[] => {
+      if (!isGradeKind(r.kind) || !isQuarter(r.quarter)) return [];
+      return [
+        {
+          id: r.id,
+          subjectId: r.subject_id,
+          quarter: r.quarter,
+          date: r.date,
+          kind: r.kind,
+          title: typeof r.title === 'string' ? r.title : '',
+          points: clampPoints(Number(r.points)),
+          weight: Number.isFinite(Number(r.weight)) ? clampWeight(Number(r.weight)) : defaultWeight(r.kind),
+          examId: typeof r.exam_id === 'string' ? r.exam_id : null,
+        },
+      ];
+    }),
+    gradeSettings: gs.error ? readGradeSettings(null) : readGradeSettings(gs.data?.data),
     account,
     taskStyles: (ts2.error ? [] : ts2.data ?? []).map(
       (r): StyleRecord => ({
@@ -489,6 +522,8 @@ export function pickRemote(s: AppState): RemoteData {
     rubrics: s.rubrics,
     practiceExams: s.practiceExams,
     abiturPlan: s.abiturPlan,
+    grades: s.grades,
+    gradeSettings: s.gradeSettings,
     taskStyles: s.taskStyles,
     account: s.account,
   };
@@ -570,6 +605,13 @@ export async function persist(action: Action, next: AppState, userId: string): P
       return;
     case 'setAbiturPlan':
       return upsert('abitur_plans', { user_id: userId, data: action.plan, updated_at: new Date().toISOString() }, 'user_id');
+    case 'upsertGrade':
+      return upsert('grades', gradeRow(userId, action.grade));
+    case 'deleteGrade':
+      ok(await supabase.from('grades').delete().eq('id', action.id));
+      return;
+    case 'setGradeSettings':
+      return upsert('grade_settings', { user_id: userId, data: action.settings, updated_at: new Date().toISOString() }, 'user_id');
     case 'upsertRubric':
       return upsert('subject_rubrics', rubricRow(userId, action.rubric), 'user_id,subject_id');
     case 'addTopic':
@@ -608,6 +650,8 @@ export async function persist(action: Action, next: AppState, userId: string): P
       await supabase.from('practice_exams').delete().eq('user_id', userId);
       await supabase.from('subject_rubrics').delete().eq('user_id', userId);
       await supabase.from('abitur_plans').delete().eq('user_id', userId);
+      await supabase.from('grades').delete().eq('user_id', userId);
+      await supabase.from('grade_settings').delete().eq('user_id', userId);
       await supabase.from('task_styles').delete().eq('user_id', userId);
       await supabase.from('flashcards').delete().eq('user_id', userId);
       await supabase.from('lesson_notes').delete().eq('user_id', userId);

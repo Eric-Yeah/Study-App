@@ -145,13 +145,14 @@ export function TimerProvider({ children }: { children: ReactNode }) {
 
   const recordFocus = useCallback(
     (t: TimerState, at: number) => {
-      // Nur das Gerät, das die Session gestartet hat, speichert sie. So wird nichts doppelt gezählt.
-      if (t.phase !== 'focus' || t.deviceId !== me) return;
+      // Mit Kennung der Phase darf jedes Gerät speichern, die Session hat überall dieselbe ID (die Datenbank überschreibt sie nur).
+      // Das fängt ab, dass ein Gerät im Hintergrund das Ende nicht mehr rechtzeitig merkt. Ältere Stände ohne Kennung speichert nur das letzte Gerät, das etwas geändert hat.
+      if (t.phase !== 'focus' || (!t.runId && t.deviceId !== me)) return;
       const minutes = Math.floor(Math.min(elapsedOf(t, at), t.durationMs) / 60_000);
       if (minutes < 1) return;
       dispatch({
         type: 'addSession',
-        session: { id: uid(), subjectId: t.subjectId, startedAt: at - minutes * 60_000, endedAt: at, minutes },
+        session: { id: t.runId ? `run-${t.runId}` : uid(), subjectId: t.subjectId, startedAt: at - minutes * 60_000, endedAt: at, minutes },
       });
     },
     [dispatch, me],
@@ -174,7 +175,7 @@ export function TimerProvider({ children }: { children: ReactNode }) {
     if (timer.status !== 'running') return;
     if (elapsedOf(timer, now) < timer.durationMs) return;
     recordFocus(timer, now);
-    commit({ ...timer, ...nextPhase(timer), status: 'idle', startedAt: null, elapsedMs: 0 });
+    commit({ ...timer, ...nextPhase(timer), status: 'idle', startedAt: null, elapsedMs: 0, runId: null });
   }, [now, timer, recordFocus, nextPhase, commit]);
 
   const api = useMemo<TimerApi>(() => {
@@ -188,7 +189,7 @@ export function TimerProvider({ children }: { children: ReactNode }) {
         const t = timerRef.current;
         if (t.status === 'running') return;
         setNow(Date.now());
-        commit({ ...t, status: 'running', startedAt: Date.now() });
+        commit({ ...t, status: 'running', startedAt: Date.now(), runId: t.runId ?? uid() });
       },
       pause: () => {
         const t = timerRef.current;
@@ -198,12 +199,12 @@ export function TimerProvider({ children }: { children: ReactNode }) {
       reset: () => {
         const t = timerRef.current;
         recordFocus(t, Date.now());
-        commit({ ...t, status: 'idle', startedAt: null, elapsedMs: 0, durationMs: phaseMs(t.phase, app.timer) });
+        commit({ ...t, status: 'idle', startedAt: null, elapsedMs: 0, durationMs: phaseMs(t.phase, app.timer), runId: null });
       },
       skip: () => {
         const t = timerRef.current;
         recordFocus(t, Date.now());
-        commit({ ...t, ...nextPhase(t), status: 'idle', startedAt: null, elapsedMs: 0 });
+        commit({ ...t, ...nextPhase(t), status: 'idle', startedAt: null, elapsedMs: 0, runId: null });
       },
       setSubject: (id) => commit({ ...timerRef.current, subjectId: id }),
     };

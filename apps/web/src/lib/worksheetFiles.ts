@@ -1,4 +1,5 @@
 import { CONFIG, fitWithin, isBlankPage, needsOcr, splitKnownFiles, textKey } from '@study/core';
+import { decodeImage } from './decodeImage';
 import { loadPdfjs } from './pdfjs';
 import { resizeImage } from './resizeImage';
 
@@ -38,7 +39,7 @@ async function sha256(data: Blob): Promise<string | null> {
 /** Ist das Bild praktisch leer? Bei jedem Fehler gilt es als nicht leer, damit nie eine beschriebene Seite verloren geht. */
 async function isBlankImage(blob: Blob): Promise<boolean> {
   try {
-    const bitmap = await createImageBitmap(blob);
+    const bitmap = await decodeImage(blob);
     try {
       const { width, height } = fitWithin(bitmap.width, bitmap.height, CONFIG.ai.blankGridEdge);
       const canvas = document.createElement('canvas');
@@ -48,7 +49,7 @@ async function isBlankImage(blob: Blob): Promise<boolean> {
       if (!ctx) return false;
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, width, height);
-      ctx.drawImage(bitmap, 0, 0, width, height);
+      ctx.drawImage(bitmap.source, 0, 0, width, height);
       const { data } = ctx.getImageData(0, 0, width, height);
       const gray = new Uint8Array(width * height);
       for (let i = 0; i < gray.length; i++) gray[i] = 0.299 * data[i * 4] + 0.587 * data[i * 4 + 1] + 0.114 * data[i * 4 + 2];

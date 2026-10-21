@@ -65,6 +65,7 @@ textarea {
   display: none;
 }
 .main {
+  min-width: 0; /* als Grid-Element nicht breiter werden als der Platz, sonst schiebt eine Chip-Reihe die Seite auseinander */
   width: 100%;
   max-width: 1100px;
   margin: 0 auto;
@@ -1291,6 +1292,10 @@ select.input.agenda-select {
   .link-btn {
     display: inline-flex;
     align-items: center;
+  }
+  summary {
+    padding-block: 12px;
+    cursor: pointer;
   }
 }
 button,

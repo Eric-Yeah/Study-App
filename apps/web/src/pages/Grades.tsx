@@ -14,6 +14,7 @@ import {
   pointsLabel,
   pointsToDecimalGrade,
   quarterOverview,
+  reviewCandidates,
   shareFor,
   toIsoDate,
   type GradeEntry,
@@ -112,6 +113,10 @@ export function Grades() {
     () => examsWithoutGrade(state.exams, state.grades, today).filter((e) => subjectIds.has(e.subjectId)),
     [state.exams, state.grades, today, subjectIds],
   );
+  const fromReviews = useMemo(
+    () => reviewCandidates(state.examReviews, state.grades, state.exams, subjectIds, quarter),
+    [state.examReviews, state.grades, state.exams, subjectIds, quarter],
+  );
   const subjectName = (id: string) => state.subjects.find((s) => s.id === id)?.name ?? '';
 
   const save = (subjectId: string, d: GradeDraft) => {
@@ -192,6 +197,39 @@ export function Grades() {
                 }}
               >
                 <Plus size={16} aria-hidden="true" /> Note eintragen
+              </button>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {fromReviews.length > 0 && (
+        <section className="stack" style={{ gap: 8 }}>
+          <div className="between">
+            <h2 className="section-head">Aus korrigierten Klausuren</h2>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => {
+                for (const c of fromReviews) dispatch({ type: 'upsertGrade', grade: c.grade });
+                setMessage(`${fromReviews.length} Klausurnote${fromReviews.length === 1 ? '' : 'n'} übernommen.`);
+              }}
+            >
+              Alle übernehmen
+            </button>
+          </div>
+          <p className="hint">Für diese Klausuren hast du bei der Korrektur die Note deiner Lehrkraft eingetragen. Ohne Halbjahr in der Korrektur landen sie in {quarter}.</p>
+          {fromReviews.map(({ reviewId, grade }) => (
+            <div key={reviewId} className="card between" style={{ padding: 14 }}>
+              <span>
+                <strong>{grade.title}</strong>
+                <br />
+                <span className="hint">
+                  {subjectName(grade.subjectId)} · {formatDateShort(grade.date)} · {grade.quarter} · {grade.points} Punkte ({pointsLabel(grade.points)})
+                </span>
+              </span>
+              <button type="button" className="btn" onClick={() => dispatch({ type: 'upsertGrade', grade })}>
+                <Plus size={16} aria-hidden="true" /> Übernehmen
               </button>
             </div>
           ))}

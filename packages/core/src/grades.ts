@@ -7,6 +7,7 @@
 import type { AbiturPlan } from './abitur';
 import { CONFIG } from './config';
 import { QUARTERS, type Quarter } from './documents';
+import type { ExamReview } from './examReviews';
 import type { Exam, Subject } from './types';
 
 const G = CONFIG.grades;
@@ -265,4 +266,59 @@ export function examsWithoutGrade(exams: readonly Exam[], entries: readonly Grad
   return exams
     .filter((e) => e.date <= today && e.date >= limit && !linked.has(e.id))
     .sort((a, b) => b.date.localeCompare(a.date));
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Noten aus korrigierten Klausuren
+
+/** Eine Klausurnote der Lehrkraft aus der Klausurenkorrektur, die noch nicht als Einzelnote eingetragen ist. */
+export interface ReviewCandidate {
+  reviewId: string;
+  grade: GradeEntry;
+}
+
+/** Id der Einzelnote, die aus einer Korrektur entsteht: gleich bleibend, damit ein erneutes Übernehmen nichts doppelt anlegt. */
+export const reviewGradeId = (reviewId: string): string => `review-${reviewId}`;
+
+/**
+ * Echte Klausuren (keine Übungsklausuren) mit eingetragener Note der Lehrkraft, zu denen noch keine Einzelnote besteht.
+ * Als bereits vorhanden gilt eine Note mit derselben Id, derselben verknüpften Klausur im Plan oder einer Klausur im selben
+ * Fach mit gleichem Datum und gleichen Punkten. Das Halbjahr kommt aus der Korrektur, sonst aus `fallback`.
+ */
+export function reviewCandidates(
+  reviews: readonly ExamReview[],
+  entries: readonly GradeEntry[],
+  exams: readonly Exam[],
+  subjectIds: ReadonlySet<string>,
+  fallback: Quarter,
+): ReviewCandidate[] {
+  const examIds = new Set(exams.map((e) => e.id));
+  const out: ReviewCandidate[] = [];
+  for (const r of reviews) {
+    if (r.practiceId !== null || r.teacherPoints === null || r.subjectId === null || !subjectIds.has(r.subjectId)) continue;
+    const id = reviewGradeId(r.id);
+    const points = clampPoints(r.teacherPoints);
+    const known = entries.some(
+      (e) =>
+        e.id === id ||
+        (r.examId !== null && e.examId === r.examId) ||
+        (e.subjectId === r.subjectId && groupOf(e.kind) === 'written' && e.date === r.examDate && e.points === points),
+    );
+    if (known) continue;
+    out.push({
+      reviewId: r.id,
+      grade: {
+        id,
+        subjectId: r.subjectId,
+        quarter: r.quarter ?? fallback,
+        date: r.examDate,
+        kind: 'exam',
+        title: r.title,
+        points,
+        weight: defaultWeight('exam'),
+        examId: r.examId !== null && examIds.has(r.examId) ? r.examId : null,
+      },
+    });
+  }
+  return out.sort((a, b) => b.grade.date.localeCompare(a.grade.date));
 }

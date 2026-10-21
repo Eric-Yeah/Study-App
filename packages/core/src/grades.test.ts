@@ -12,10 +12,13 @@ import {
   pointsToDecimalGrade,
   quarterOverview,
   readGradeSettings,
+  reviewCandidates,
+  reviewGradeId,
   trendOf,
   type GradeEntry,
   type GradeKind,
 } from './grades';
+import type { ExamReview } from './examReviews';
 import type { Exam, Subject } from './types';
 
 let n = 0;
@@ -198,5 +201,57 @@ describe('Hilfsfunktionen', () => {
   it('liest kaputte Einstellungen sicher', () => {
     expect(readGradeSettings(null)).toEqual({ writtenShare: {} });
     expect(readGradeSettings({ writtenShare: { a: 70, b: 'x', c: 999 } })).toEqual({ writtenShare: { a: 70, c: 100 } });
+  });
+});
+
+describe('reviewCandidates', () => {
+  const review = (extra: Partial<ExamReview> = {}): ExamReview => ({
+    id: 'r1',
+    subjectId: 'm',
+    examId: null,
+    title: 'Klausur Analysis',
+    examDate: '2026-10-05',
+    teacher: '',
+    quarter: null,
+    maxPoints: null,
+    horizonText: '',
+    main: null,
+    compare: null,
+    teacherPoints: 11,
+    teacherTasks: null,
+    learnedAt: null,
+    practiceId: null,
+    createdAt: '',
+    ...extra,
+  });
+  const ids = new Set(['m']);
+
+  it('macht aus einer Note der Lehrkraft eine Klausurnote mit gleich bleibender Id', () => {
+    const [c] = reviewCandidates([review({ quarter: 'Q2' })], [], [], ids, 'Q1');
+    expect(c!.grade).toMatchObject({ id: reviewGradeId('r1'), kind: 'exam', points: 11, quarter: 'Q2', date: '2026-10-05', examId: null });
+  });
+
+  it('nimmt das gewählte Halbjahr, wenn die Korrektur keins hat', () => {
+    expect(reviewCandidates([review()], [], [], ids, 'Q3')[0]!.grade.quarter).toBe('Q3');
+  });
+
+  it('überspringt Übungsklausuren, fehlende Noten und unbekannte Fächer', () => {
+    const list = [review({ practiceId: 'p' }), review({ id: 'r2', teacherPoints: null }), review({ id: 'r3', subjectId: 'x' }), review({ id: 'r4', subjectId: null })];
+    expect(reviewCandidates(list, [], [], ids, 'Q1')).toEqual([]);
+  });
+
+  it('überspringt, was schon eingetragen ist (Id, verknüpfte Klausur, gleiche Klausur mit gleichen Punkten)', () => {
+    const exam = { id: 'e1', subjectId: 'm', title: '', date: '2026-10-05', priorityManual: null, totalHoursManual: null, startDaysManual: null };
+    expect(reviewCandidates([review()], [entry(5, 'exam', { id: reviewGradeId('r1') })], [], ids, 'Q1')).toEqual([]);
+    expect(reviewCandidates([review({ examId: 'e1' })], [entry(5, 'exam', { examId: 'e1' })], [exam], ids, 'Q1')).toEqual([]);
+    expect(reviewCandidates([review()], [entry(11, 'exam', { date: '2026-10-05' })], [], ids, 'Q1')).toEqual([]);
+    // gleiche Punkte, aber anderes Datum: ist eine andere Klausur
+    expect(reviewCandidates([review()], [entry(11, 'exam', { date: '2026-09-01' })], [], ids, 'Q1')).toHaveLength(1);
+  });
+
+  it('verknüpft nur Klausuren, die es im Plan noch gibt', () => {
+    const exam = { id: 'e1', subjectId: 'm', title: '', date: '2026-10-05', priorityManual: null, totalHoursManual: null, startDaysManual: null };
+    expect(reviewCandidates([review({ examId: 'e1' })], [], [exam], ids, 'Q1')[0]!.grade.examId).toBe('e1');
+    expect(reviewCandidates([review({ examId: 'weg' })], [], [exam], ids, 'Q1')[0]!.grade.examId).toBeNull();
   });
 });

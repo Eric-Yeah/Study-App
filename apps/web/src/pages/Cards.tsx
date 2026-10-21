@@ -19,7 +19,7 @@ import {
   type TestQuestion,
 } from '@study/core';
 import { BookOpen, Brain, CheckSquare, ChevronDown, ClipboardCheck, ListChecks, PenLine, Plus, Puzzle, Search, Trash2, X, type LucideIcon } from 'lucide-react';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState } from 'react';
 import { CardForm } from '../components/CardForm';
 import { StudyBrowse } from '../components/cards/StudyBrowse';
 import { StudyChoice } from '../components/cards/StudyChoice';
@@ -125,7 +125,7 @@ function ModeTile({ icon: Icon, title, text, meta, disabled, onClick }: { icon: 
   );
 }
 
-export function Cards({ tabs }: { tabs: ReactNode }) {
+export function Cards() {
   const { state, dispatch } = useStore();
   const today = toIsoDate(new Date());
   const [filter, setFilter] = useState<string | null>(null); // null = alle Fächer
@@ -233,14 +233,13 @@ export function Cards({ tabs }: { tabs: ReactNode }) {
     <div className="stack" style={{ gap: 20 }}>
       <div className="page-head">
         <div>
-          <h1>Notizen</h1>
-          <p className="sub">Karteikarten: Lernen in wachsenden Abständen, Schreiben, Auswahl, Zuordnen und Test.</p>
+          <h1>Karteikarten</h1>
+          <p className="sub">Lernen in wachsenden Abständen, Schreiben, Auswahl, Zuordnen und Test.</p>
         </div>
         <button type="button" className="btn btn-primary" onClick={() => setAdding(!adding)} aria-expanded={adding}>
           <Plus size={18} aria-hidden="true" /> Neue Karte
         </button>
       </div>
-      {tabs}
 
       {adding && (
         <CardForm

@@ -151,7 +151,7 @@ export function ExamCorrect() {
           <h1>Klausur korrigieren lassen</h1>
           <p className="sub">Die KI korrigiert nach dem Korrekturmuster des Fachs, die Note rechnet die App nach den Regeln der OAVO.</p>
         </div>
-        <Link className="btn" to={practice ? `/korrektur/uebung/${practice.id}` : '/notizen?ansicht=klausuren'}>
+        <Link className="btn" to={practice ? `/korrektur/uebung/${practice.id}` : '/korrektur'}>
           <ArrowLeft size={16} aria-hidden="true" /> Zurück
         </Link>
       </div>

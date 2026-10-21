@@ -77,7 +77,7 @@ textarea {
   right: 0;
   bottom: 0;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   background: var(--surface);
   border-top: 1px solid var(--line);
   padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -1320,10 +1320,6 @@ label {
   color: var(--warn);
   font-weight: 600;
 }
-.bottom-nav {
-  /* "Einstellungen" ist das längste Wort und wird sonst auf schmalen Handys abgeschnitten */
-  grid-template-columns: repeat(5, 1fr) 1.4fr;
-}
 .note-filter {
   flex-wrap: nowrap;
   gap: 6px;
@@ -1492,11 +1488,6 @@ label {
   display: flex;
   align-items: center;
   gap: 6px;
-}
-@media (min-width: 768px) {
-  .bottom-nav {
-    grid-template-columns: repeat(5, 1fr);
-  }
 }
 
 @media (max-width: 420px) {
@@ -3331,4 +3322,66 @@ a.chip {
   .notice {
     border-color: var(--line);
   }
+}
+
+/* Reiter innerhalb eines Bereichs (SectionTabs): echte Links, bei wenig Platz seitlich wischbar */
+.subnav {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 20px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.subnav::-webkit-scrollbar {
+  display: none;
+}
+.subnav a {
+  flex: 1;
+  min-width: max-content;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-s);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 14px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.subnav a[aria-current='page'] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+@media (min-width: 768px) {
+  .subnav a {
+    flex: 0 0 auto;
+  }
+}
+@media (pointer: coarse) {
+  .subnav a {
+    min-height: 44px;
+  }
+}
+
+/* Einstellungen: am Handy als Zahnrad in der Kopfzeile, sonst unten in der Seitenleiste */
+.topbar-settings {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: var(--ink-2);
+}
+.topbar-settings.active {
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+}
+.sidebar .nav-link.nav-settings {
+  margin-top: auto;
 }

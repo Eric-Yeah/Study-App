@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react';
-import { BookOpen, CalendarDays, Home, NotebookPen, Settings as SettingsIcon, Timer } from 'lucide-react';
-import { HashRouter, Navigate, NavLink, Outlet, Route, Routes, useLocation } from 'react-router-dom';
+import { HashRouter, Link, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './lib/auth';
 import { ExamEditor } from './pages/ExamEditor';
 import { ExamCorrect } from './pages/ExamCorrect';
@@ -10,6 +9,11 @@ import { PracticeView } from './pages/PracticeView';
 import { RubricPage } from './pages/RubricPage';
 import { Weaknesses } from './pages/Weaknesses';
 import { Abitur } from './pages/Abitur';
+import { Cards } from './pages/Cards';
+import { Exams } from './pages/Exams';
+import { Corrections, PracticeExams } from './components/exam/Corrections';
+import { SectionTabs } from './components/SectionTabs';
+import { MAIN_AREAS, SETTINGS_AREA, locate } from './nav';
 import { Grades } from './pages/Grades';
 import { StylePage } from './pages/StylePage';
 import { Focus } from './pages/Focus';
@@ -36,23 +40,22 @@ import { TimerProvider } from './timer/TimerProvider';
 
 const LOGO = `${import.meta.env.BASE_URL}favicon.svg`;
 
-const NAV = [
-  { to: '/', label: 'Heute', icon: Home },
-  { to: '/fokus', label: 'Fokus', icon: Timer },
-  { to: '/plan', label: 'Plan', icon: CalendarDays },
-  { to: '/notizen', label: 'Notizen', icon: NotebookPen },
-  { to: '/faecher', label: 'Fächer', icon: BookOpen },
-  { to: '/einstellungen', label: 'Einstellungen', icon: SettingsIcon },
-];
-
-function NavItems() {
+function NavItems({ withSettings = false }: { withSettings?: boolean }) {
+  const { pathname } = useLocation();
+  const current = locate(pathname).area;
+  const items = withSettings ? [...MAIN_AREAS, SETTINGS_AREA] : MAIN_AREAS;
   return (
     <>
-      {NAV.map(({ to, label, icon: Icon }) => (
-        <NavLink key={to} to={to} end={to === '/'} className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+      {items.map(({ id, to, label, icon: Icon }) => (
+        <Link
+          key={id}
+          to={to}
+          aria-current={current === id ? 'page' : undefined}
+          className={`nav-link${current === id ? ' active' : ''}${id === 'einstellungen' ? ' nav-settings' : ''}`}
+        >
           <Icon size={20} aria-hidden="true" />
           <span>{label}</span>
-        </NavLink>
+        </Link>
       ))}
     </>
   );
@@ -61,6 +64,7 @@ function NavItems() {
 function Layout() {
   const { state, syncError } = useStore();
   const location = useLocation();
+  const inSettings = locate(location.pathname).area === 'einstellungen';
   if (!state.onboarded) return <Navigate to="/start" replace />;
   return (
     <div className="app">
@@ -69,11 +73,19 @@ function Layout() {
           <img src={LOGO} alt="" width={30} height={30} />
           Study App
         </div>
-        <NavItems />
+        <NavItems withSettings />
       </nav>
       <header className="topbar">
         <img src={LOGO} alt="" width={28} height={28} />
         <span>Study App</span>
+        <Link
+          to={SETTINGS_AREA.to}
+          className={`topbar-settings${inSettings ? ' active' : ''}`}
+          aria-label="Einstellungen"
+          aria-current={inSettings ? 'page' : undefined}
+        >
+          <SETTINGS_AREA.icon size={22} aria-hidden="true" />
+        </Link>
       </header>
       <UpdateManager />
       <PushSync />
@@ -84,6 +96,7 @@ function Layout() {
             Änderungen konnten nicht gespeichert werden: {syncError}
           </p>
         )}
+        <SectionTabs />
         <ErrorBoundary key={location.pathname}>
           <Outlet />
         </ErrorBoundary>
@@ -128,6 +141,8 @@ export function App() {
               <Route path="fokus" element={<Focus />} />
               <Route path="plan" element={<Plan />} />
               <Route path="notizen" element={<Notes />} />
+              <Route path="karten" element={<Cards />} />
+              <Route path="klausuren" element={<Exams />} />
               <Route path="rueckblick" element={<Review />} />
               <Route path="faecher" element={<Subjects />} />
               <Route path="abitur" element={<Abitur />} />
@@ -136,6 +151,8 @@ export function App() {
               <Route path="import" element={<LanisImport />} />
               <Route path="klausur/neu" element={<ExamEditor key="new" />} />
               <Route path="klausur/:id" element={<ExamEditor />} />
+              <Route path="korrektur" element={<Corrections />} />
+              <Route path="korrektur/uebung" element={<PracticeExams />} />
               <Route path="korrektur/neu" element={<RequireAi feature="correct"><ExamCorrect /></RequireAi>} />
               <Route path="korrektur/schwaechen" element={<Weaknesses />} />
               <Route path="korrektur/stil/:subjectId" element={<RequireAi feature="style"><StylePage /></RequireAi>} />

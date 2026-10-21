@@ -1,17 +1,10 @@
-import { lessonsOn, splitFreePeriods, toIsoDate, type PlanDay, type RealityStatus, type Timetable } from '@study/core';
-import { CalendarOff, ChevronDown, Plus, Utensils } from 'lucide-react';
+import { lessonsOn, splitFreePeriods, toIsoDate, type PlanDay, type Timetable } from '@study/core';
+import { CalendarOff, ChevronDown, ChevronRight, Plus, Utensils } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { TimetableGrid } from '../components/TimetableGrid';
-import { Timeline } from '../components/Timeline';
-import {
-  formatAgendaDay,
-  formatDateShort,
-  formatHours,
-  formatInDays,
-  formatMinutes,
-} from '../lib/format';
-import { blocksForDate, combinedPlan, examsWithPlans, learnedForExam, learnedMinutesOn, realityFor, topicsOf, type ExamWithPlan } from '../state/selectors';
+import { formatAgendaDay, formatMinutes } from '../lib/format';
+import { blocksForDate, combinedPlan, examsWithPlans, learnedMinutesOn, type ExamWithPlan } from '../state/selectors';
 import { useStore } from '../state/store';
 
 const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
@@ -24,14 +17,6 @@ const CAPACITY_OPTIONS = [
   { value: 30, label: 'Bis 30 min' },
   { value: 0, label: 'Fällt aus' },
 ];
-
-const REALITY_TEXT: Record<RealityStatus, (min: number) => string> = {
-  not_started: () => '',
-  ahead: (m) => `${formatMinutes(m)} voraus`,
-  on_track: () => 'Im Plan',
-  behind: (m) => `${formatMinutes(-m)} hinter dem Plan`,
-  far_behind: (m) => `${formatMinutes(-m)} hinter dem Plan`,
-};
 
 function schoolInfo(tt: Timetable, date: string) {
   const lessons = lessonsOn(tt, date);
@@ -189,6 +174,7 @@ export function Plan() {
   const max = Math.max(60, ...week.map((w) => Math.max(w.planned, w.learned)));
   const total = week.reduce((s, w) => s + w.planned, 0);
 
+  const upcoming = list.filter((x) => x.plan.daysLeft >= 0).length;
   const agenda = plan.days.slice(0, AGENDA_DAYS);
   const shortfalls = Object.entries(plan.shortfall)
     .map(([examId, minutes]) => ({ item: list.find((x) => x.exam.id === examId), minutes }))
@@ -202,12 +188,6 @@ export function Plan() {
           <p className="sub">Diese Woche geplant: {formatMinutes(total)}</p>
         </div>
         <div className="row">
-          <Link className="btn" to="/rueckblick">
-            Wochenrückblick
-          </Link>
-          <Link className="btn" to="/import">
-            Aus Lanis importieren
-          </Link>
           <Link className="btn btn-primary" to="/klausur/neu">
             <Plus size={18} aria-hidden="true" /> Klausur anlegen
           </Link>
@@ -280,59 +260,15 @@ export function Plan() {
 
       <TimetableGrid />
 
-      <h2>Klausuren</h2>
-      {list.length === 0 && (
-        <div className="card empty">
-          <p className="muted">Noch keine Klausur angelegt. Importiere sie aus Lanis oder lege sie von Hand an.</p>
-        </div>
-      )}
-      <div className="grid cols-2">
-        {list.map((item) => {
-          const learned = learnedForExam(state.sessions, item) / 60;
-          const totalH = item.plan.totalHours.value;
-          const topics = topicsOf(state, item.exam.id);
-          const reality = item.plan.hasPlan && item.plan.daysLeft > 0 ? realityFor(state, item, today) : null;
-          return (
-            <Link
-              key={item.exam.id}
-              to={`/klausur/${item.exam.id}`}
-              className="card exam-card stack"
-              style={{ ['--c' as string]: item.subject.color }}
-            >
-              <div className="between">
-                <strong className="exam-title">{item.exam.title || item.subject.name}</strong>
-                <span className={`tag${item.plan.daysLeft <= 7 && item.plan.daysLeft >= 0 ? ' warn' : ''}`}>
-                  {item.plan.daysLeft < 0 ? 'vorbei' : item.plan.daysLeft === 0 ? 'heute' : formatInDays(item.plan.daysLeft)}
-                </span>
-              </div>
-              <p className="hint">
-                {item.subject.name} · {formatDateShort(item.exam.date)} · Priorität {item.plan.priority.value}
-              </p>
-              {item.plan.hasPlan ? (
-                <>
-                  <div className="bar">
-                    <i style={{ width: `${totalH ? Math.min(100, (learned / totalH) * 100) : 0}%`, background: 'var(--c)' }} />
-                  </div>
-                  <p className="hint">
-                    {formatHours(learned)} von {formatHours(totalH)} · {formatMinutes(item.plan.minutesPerStudyDay)} pro Lerntag
-                  </p>
-                  {reality && reality.status !== 'not_started' && (
-                    <p className={`reality ${reality.status}`}>{REALITY_TEXT[reality.status](reality.deltaMin)}</p>
-                  )}
-                  {topics.total > 0 && (
-                    <p className="hint">
-                      Themen: {topics.done} von {topics.total} erledigt
-                    </p>
-                  )}
-                  <Timeline days={item.plan.timeline} showLegend={false} />
-                </>
-              ) : (
-                <p className="hint">Fach abgewählt, kein Lernplan.</p>
-              )}
-            </Link>
-          );
-        })}
-      </div>
+      <Link to="/klausuren" className="card between" style={{ textDecoration: 'none', color: 'inherit' }}>
+        <span>
+          <strong>Klausuren</strong>
+          <span className="hint" style={{ display: 'block' }}>
+            {upcoming === 0 ? 'Keine Klausur geplant' : upcoming === 1 ? '1 Klausur steht an' : `${upcoming} Klausuren stehen an`} · Fortschritt, Themen und Korrektur
+          </span>
+        </span>
+        <ChevronRight size={18} aria-hidden="true" />
+      </Link>
     </div>
   );
 }

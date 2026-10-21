@@ -31,7 +31,7 @@ export function RubricPage() {
     return (
       <div className="card stack">
         <p className="muted">Dieses Fach gibt es nicht mehr.</p>
-        <Link className="btn" to="/notizen?ansicht=klausuren">
+        <Link className="btn" to="/korrektur">
           Zu den Klausuren
         </Link>
       </div>
@@ -66,7 +66,7 @@ export function RubricPage() {
             {rubric.label}. Danach korrigiert die KI. Vorgaben deiner Lehrkraft gehen vor, Erfahrungen aus zurückgegebenen Klausuren machen es mit der Zeit genauer.
           </p>
         </div>
-        <Link className="btn" to="/notizen?ansicht=klausuren">
+        <Link className="btn" to="/korrektur">
           <ArrowLeft size={16} aria-hidden="true" /> Klausuren
         </Link>
       </div>

@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useUserId } from '../lib/auth';
-import { uid } from '../lib/format';
+import { formatClock, uid } from '../lib/format';
 import { supabase } from '../lib/supabase';
 import { useStore, type TimerSettings } from '../state/store';
 import type { TimerPhase, TimerState } from './types';
@@ -43,6 +43,10 @@ interface TimerApi {
   progress: number;
   synced: boolean;
   start: () => void;
+  /** Fokusphase für ein Fach und eine Länge starten (nur wenn der Timer steht), eine anstehende Pause wird übersprungen. */
+  startWith: (opts: { subjectId: string | null; minutes?: number }) => void;
+  /** Länge der nächsten Fokusphase nur für diesen Durchgang ändern (nur wenn der Timer steht). */
+  setLength: (minutes: number) => void;
   pause: () => void;
   reset: () => void;
   skip: () => void;
@@ -175,8 +179,28 @@ export function TimerProvider({ children }: { children: ReactNode }) {
     if (timer.status !== 'running') return;
     if (elapsedOf(timer, now) < timer.durationMs) return;
     recordFocus(timer, now);
+    try {
+      navigator.vibrate?.([200, 100, 200]); // Ende der Phase auch ohne Ton bemerken (wo das Gerät es kann)
+    } catch {
+      /* ignorieren */
+    }
     commit({ ...timer, ...nextPhase(timer), status: 'idle', startedAt: null, elapsedMs: 0, runId: null });
   }, [now, timer, recordFocus, nextPhase, commit]);
+
+  // Restzeit im Tab-Titel, damit man sie auch in einem anderen Tab oder Fenster sieht
+  const baseTitle = useRef<string | null>(null);
+  const secondsLeft = Math.ceil(Math.max(0, timer.durationMs - elapsedOf(timer, now)) / 1000);
+  useEffect(() => {
+    if (timer.status !== 'running') {
+      if (baseTitle.current !== null) {
+        document.title = baseTitle.current;
+        baseTitle.current = null;
+      }
+      return;
+    }
+    if (baseTitle.current === null) baseTitle.current = document.title;
+    document.title = `${formatClock(secondsLeft * 1000)} · ${timer.phase === 'focus' ? 'Fokus' : 'Pause'}`;
+  }, [timer.status, timer.phase, secondsLeft]);
 
   const api = useMemo<TimerApi>(() => {
     const elapsed = elapsedOf(timer, now);
@@ -190,6 +214,19 @@ export function TimerProvider({ children }: { children: ReactNode }) {
         if (t.status === 'running') return;
         setNow(Date.now());
         commit({ ...t, status: 'running', startedAt: Date.now(), runId: t.runId ?? uid() });
+      },
+      startWith: ({ subjectId, minutes }) => {
+        const t = timerRef.current;
+        if (t.status !== 'idle') return;
+        const now = Date.now();
+        setNow(now);
+        const durationMs = minutes && minutes > 0 ? Math.round(minutes) * 60_000 : phaseMs('focus', app.timer);
+        commit({ ...t, phase: 'focus', subjectId, durationMs, status: 'running', startedAt: now, elapsedMs: 0, runId: uid() });
+      },
+      setLength: (minutes) => {
+        const t = timerRef.current;
+        if (t.status !== 'idle' || t.phase !== 'focus') return;
+        commit({ ...t, durationMs: Math.max(1, Math.round(minutes)) * 60_000 });
       },
       pause: () => {
         const t = timerRef.current;

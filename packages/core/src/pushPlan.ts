@@ -3,6 +3,7 @@
  * Rückstand). Die App lädt sie in die Warteschlange, der Server verschickt sie zur Uhrzeit. Reine Funktionen, nur Web-App.
  */
 import { CONFIG } from './config';
+import { estimateCardMinutes } from './daily';
 import { addDays } from './schedule';
 
 export interface PushPrefs {
@@ -42,6 +43,7 @@ export function readPushPrefs(v: unknown): PushPrefs {
 export interface PushDay {
   date: string; // YYYY-MM-DD
   blocks: { subject: string; minutes: number }[]; // geplante Blöcke, gleiche Fächer schon zusammengefasst
+  cards?: number; // so viele Karteikarten sind an dem Tag fällig (Wiederholungen und neue), fehlt: unbekannt
 }
 
 export interface PushExam {
@@ -101,6 +103,8 @@ export function buildPushItems(input: { now: Date; today: string; days: PushDay[
       const day = days.find((d) => d.date === date);
       const total = day?.blocks.reduce((s, b) => s + b.minutes, 0) ?? 0;
       const label = i === 0 ? 'Heute' : 'Morgen';
+      const cards = day?.cards ?? 0;
+      const cardsLine = cards > 0 ? ` Dazu ${cards} ${cards === 1 ? 'Karte' : 'Karten'} zum Wiederholen.` : '';
       const next = upcoming.find((e) => e.date > date);
       const nextLine = next ? ` Nächste Klausur: ${next.subject} ${inDays(dayDiff(date, next.date))}.` : '';
       if (examToday) {
@@ -108,7 +112,16 @@ export function buildPushItems(input: { now: Date; today: string; days: PushDay[
       } else if (total > 0 && day) {
         const subjects = day.blocks.slice(0, CONFIG.push.maxSubjects).map((b) => `${b.subject} ${pushMinutes(b.minutes)}`);
         const more = day.blocks.length > CONFIG.push.maxSubjects ? ` und ${day.blocks.length - CONFIG.push.maxSubjects} weitere` : '';
-        out.push({ kind: 'plan', dueAt: due.toISOString(), title: `${label}: ${pushMinutes(total)} lernen`, body: `${subjects.join(' · ')}${more}.${nextLine}`, url: '/' });
+        out.push({ kind: 'plan', dueAt: due.toISOString(), title: `${label}: ${pushMinutes(total)} lernen`, body: `${subjects.join(' · ')}${more}.${cardsLine}${nextLine}`, url: '/' });
+      } else if (cards > 0) {
+        // Auch ohne Lernblock ein Grund, kurz hineinzuschauen: die fälligen Karten
+        out.push({
+          kind: 'plan',
+          dueAt: due.toISOString(),
+          title: `${label}: ${cards} ${cards === 1 ? 'Karte' : 'Karten'} fällig`,
+          body: `Etwa ${pushMinutes(estimateCardMinutes(cards))}, ein kurzer Durchgang reicht.${nextLine}`,
+          url: `/karten?runde=${CONFIG.daily.miniRoundCards}&von=heute`,
+        });
       }
     }
   }

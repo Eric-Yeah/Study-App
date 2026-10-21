@@ -61,6 +61,20 @@ describe('Tagesplan morgens', () => {
     const items = buildPushItems({ ...base, days: [{ date: '2026-10-10', blocks }], exams: [], prefs: prefs({ exam: false }) });
     expect(items[0]!.body).toBe('A 10 min · B 10 min · C 10 min · D 10 min und 2 weitere.');
   });
+  it('nennt fällige Karteikarten im Tagesplan', () => {
+    const days = [{ date: '2026-10-10', blocks: [{ subject: 'Mathe', minutes: 45 }], cards: 12 }, { date: '2026-10-11', blocks: [] }];
+    const items = buildPushItems({ ...base, days, exams: [], prefs: prefs({ exam: false }) });
+    expect(items[0]!.body).toBe('Mathe 45 min. Dazu 12 Karten zum Wiederholen.');
+  });
+  it('schickt auch ohne Lernblock eine Erinnerung, wenn Karten fällig sind', () => {
+    const days = [{ date: '2026-10-10', blocks: [], cards: 8 }, { date: '2026-10-11', blocks: [], cards: 0 }];
+    const items = buildPushItems({ ...base, days, exams: [], prefs: prefs({ exam: false }) });
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ kind: 'plan', title: 'Heute: 8 Karten fällig', url: '/karten?runde=5&von=heute' });
+    expect(items[0]!.body).toBe('Etwa 4 min, ein kurzer Durchgang reicht.');
+    const one = buildPushItems({ ...base, days: [{ date: '2026-10-10', blocks: [], cards: 1 }], exams: [], prefs: prefs({ exam: false }) });
+    expect(one[0]!.title).toBe('Heute: 1 Karte fällig');
+  });
   it('ist aus, wenn der Tagesplan abgeschaltet ist', () => {
     expect(buildPushItems({ ...base, exams: [exam()], prefs: prefs({ plan: false, exam: false }) })).toEqual([]);
   });

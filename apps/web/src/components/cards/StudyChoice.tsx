@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../../state/store';
 import { DifficultyTag } from '../DifficultyPicker';
 import { StudyDone, StudyHead } from './StudyDone';
+import { useRoundTime } from './useRoundTime';
 
 /**
  * Multiple Choice: eine richtige und drei falsche Antworten aus anderen Karten. Zählt für die Wiederholung wie
@@ -10,6 +11,7 @@ import { StudyDone, StudyHead } from './StudyDone';
  */
 export function StudyChoice({ cards, pool, subjects, onClose }: { cards: Flashcard[]; pool: Flashcard[]; subjects: Subject[]; onClose: () => void }) {
   const { dispatch } = useStore();
+  const noteAnswer = useRoundTime(cards);
   const today = toIsoDate(new Date());
   const [round, setRound] = useState(cards.filter(isChoiceable));
   const [index, setIndex] = useState(0);
@@ -27,6 +29,7 @@ export function StudyChoice({ cards, pool, subjects, onClose }: { cards: Flashca
     const correct = i === choice.correctIndex;
     setPicked(i);
     dispatch({ type: 'upsertCard', card: reviewCard(card, gradeFor('choice', correct), today) });
+    noteAnswer();
     if (correct) setRightCount((n) => n + 1);
     else setMissed((m) => [...m, card]);
   };

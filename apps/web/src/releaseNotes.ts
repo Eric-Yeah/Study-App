@@ -12,6 +12,19 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '2026.10.21.5',
+    date: '21. Oktober 2026',
+    items: [
+      { icon: '▶️', title: 'Heute sagt dir, was jetzt dran ist', text: 'Ganz oben auf Heute steht „Als Nächstes“: das Fach aus deinem Tagesplan, in einer Freistunde passend gekürzt. Ein Tipp startet den Timer, ohne Fach und Länge auszuwählen. Ist der Plan geschafft, kommen offene Aufgaben, dann fällige Karten. Jeder geplante Block lässt sich ebenfalls direkt starten.' },
+      { icon: '➕', title: 'Schnell hinzufügen', text: 'Der runde Plus-Knopf (am Mac auch die Taste N) legt in Sekunden eine Aufgabe, eine Karteikarte oder nachgetragene Lernzeit an. Das Fach ist aus deinem Stundenplan vorgewählt, das Fenster bleibt offen für die nächste Karte. Von dort geht es auch direkt zum Blatt-Hochladen.' },
+      { icon: '🃏', title: 'Karten in Häppchen', text: 'Heute zeigt, wie viele Karten fällig sind, und „5 Karten jetzt“ startet eine kurze Runde, danach geht es mit „Noch …“ weiter oder zurück. Kartenrunden zählen jetzt als Lernzeit für Tagesziel, Plan und Serie.' },
+      { icon: '🔥', title: 'Serie ohne Druck', text: 'Die Woche als Punkte und die Zahl der Lerntage in Folge stehen bei der Lernzeit. Ein freier Tag bricht die Serie nicht, lernfreie Wochentage und Ausfalltage zählen gar nicht. Ab 10 Minuten zählt ein Tag.' },
+      { icon: '⏱️', title: 'Timer immer im Blick', text: 'Läuft der Timer, zeigt eine Leiste oben auf jeder Seite Fach und Restzeit, im Browser-Tab steht die Zeit im Titel. Auf der Fokus-Seite ist das Fach vorgewählt, und die Länge der Runde (15, 25, 45, 60 Minuten) stellst du mit einem Tipp ein.' },
+      { icon: '🔔', title: 'Erinnerungen leichter einschalten', text: 'Auf Heute fragt ein Hinweis einmal, ob du den Tagesplan morgens aufs Handy willst, mit einem Tipp eingeschaltet. Die Morgenmitteilung nennt jetzt auch die fälligen Karten und kommt an Tagen ohne Lernblock, wenn Karten warten.' },
+      { icon: '🧹', title: 'Kürzere Heute-Seite', text: 'Der Check-in zeigt nur noch die Energie (ein Tipp), Schlaf und Training klappst du bei Bedarf auf. Offene Aufgaben von früher bleiben auf Heute sichtbar, statt unbemerkt zu verschwinden.' },
+    ],
+  },
+  {
     version: '2026.10.21.4',
     date: '21. Oktober 2026',
     items: [

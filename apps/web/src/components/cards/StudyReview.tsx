@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { DifficultyTag } from '../DifficultyPicker';
 import { useStore } from '../../state/store';
 import { StudyDone } from './StudyDone';
+import { useRoundTime } from './useRoundTime';
 
 /** "gleich", "morgen", "in 3 Tagen" für die Knöpfe beim Lernen. */
 const when = (days: number) => (days <= 0 ? 'gleich' : days === 1 ? 'morgen' : `in ${days} Tagen`);
@@ -16,8 +17,20 @@ const GRADES: { grade: CardGrade; label: string; key: string }[] = [
 ];
 
 /** Eine Lernrunde: Karte zeigen, Antwort aufdecken, bewerten. "Nochmal" kommt in derselben Runde noch einmal. */
-export function StudyReview({ queue, subjects, onClose }: { queue: Flashcard[]; subjects: Subject[]; onClose: () => void }) {
+export function StudyReview({
+  queue,
+  subjects,
+  onClose,
+  more,
+}: {
+  queue: Flashcard[];
+  subjects: Subject[];
+  onClose: () => void;
+  /** Nach der Runde ein Knopf für die nächste kurze Runde (zum Beispiel "Noch 5 Karten") */
+  more?: { label: string; run: () => void };
+}) {
   const { dispatch } = useStore();
+  const noteAnswer = useRoundTime(queue);
   const today = toIsoDate(new Date());
   const [list, setList] = useState(queue);
   const [index, setIndex] = useState(0);
@@ -32,6 +45,7 @@ export function StudyReview({ queue, subjects, onClose }: { queue: Flashcard[]; 
     if (!card) return;
     const next = reviewCard(card, grade, today);
     dispatch({ type: 'upsertCard', card: next });
+    noteAnswer();
     setTally((t) => ({ ...t, [grade]: t[grade] + 1 }));
     // Vergessene Karten kommen noch einmal ans Ende der Runde, aber nur einmal je Karte
     if (grade === 'again' && !requeued.has(card.id)) {
@@ -66,6 +80,13 @@ export function StudyReview({ queue, subjects, onClose }: { queue: Flashcard[]; 
         title="Runde geschafft"
         text={`${total === 1 ? '1 Antwort' : `${total} Antworten`}: ${tally.good + tally.easy} gewusst, ${tally.hard} schwer, ${tally.again} nochmal.`}
         onClose={onClose}
+        extra={
+          more && (
+            <button type="button" className="btn" onClick={more.run}>
+              {more.label}
+            </button>
+          )
+        }
       />
     );
   }

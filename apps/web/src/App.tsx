@@ -13,6 +13,8 @@ import { Cards } from './pages/Cards';
 import { Exams } from './pages/Exams';
 import { Corrections, PracticeExams } from './components/exam/Corrections';
 import { SectionTabs } from './components/SectionTabs';
+import { QuickAdd } from './components/QuickAdd';
+import { TimerPill } from './components/TimerPill';
 import { MAIN_AREAS, SETTINGS_AREA, locate } from './nav';
 import { Grades } from './pages/Grades';
 import { StylePage } from './pages/StylePage';
@@ -61,6 +63,9 @@ function NavItems({ withSettings = false }: { withSettings?: boolean }) {
   );
 }
 
+/** Seiten, auf denen der Knopf „Schnell hinzufügen“ schwebt (nicht dort, wo unten Bedienelemente liegen, zum Beispiel in Lernrunden). */
+const QUICK_ADD_ROUTES = ['/', '/fokus', '/plan', '/rueckblick', '/notizen', '/klausuren'];
+
 function Layout() {
   const { state, syncError } = useStore();
   const location = useLocation();
@@ -96,11 +101,13 @@ function Layout() {
             Änderungen konnten nicht gespeichert werden: {syncError}
           </p>
         )}
+        <TimerPill />
         <SectionTabs />
         <ErrorBoundary key={location.pathname}>
           <Outlet />
         </ErrorBoundary>
       </main>
+      {QUICK_ADD_ROUTES.includes(location.pathname) && <QuickAdd />}
       <nav className="bottom-nav" aria-label="Hauptnavigation">
         <NavItems />
       </nav>

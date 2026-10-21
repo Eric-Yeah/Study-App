@@ -1,4 +1,6 @@
 import { CONFIG, concentration, toIsoDate, type ConcentrationTip, type LoadStatus } from '@study/core';
+import { ChevronDown } from 'lucide-react';
+import { useState } from 'react';
 import { Segmented } from './Segmented';
 import { formatMinutes, formatNumber } from '../lib/format';
 import { checkinFor, learnedMinutesOn, loadRatioOn, sleepOn, trainingLoadOn, trainingOn } from '../state/selectors';
@@ -60,6 +62,12 @@ export function ConcentrationCard({ plannedMin }: { plannedMin: number }) {
     plannedMin,
   });
 
+  // Der Check-in ist ein Tipp (Energie). Schlaf, Training und Belastung sind eingeklappt, damit die Karte kurz bleibt.
+  const [more, setMore] = useState(false);
+  const sleepText = sleep.hours === null ? 'Schlaf offen' : `Schlaf ${hoursLabel(sleep.hours)}`;
+  const trainText =
+    training.sessions === null ? 'Training offen' : training.sessions === 0 ? 'kein Training' : `Training ${training.sessions}× ${training.minutes ?? ''} min`.replace('  ', ' ');
+
   const set = (patch: Partial<Checkin>) => dispatch({ type: 'setCheckin', checkin: { ...checkin, ...patch } });
   const trainChoice = checkin.trainingSessions === null ? '' : String(Math.min(2, checkin.trainingSessions));
 
@@ -97,6 +105,13 @@ export function ConcentrationCard({ plannedMin }: { plannedMin: number }) {
         />
       </div>
 
+      <button type="button" className="link-btn more-toggle" aria-expanded={more} onClick={() => setMore(!more)}>
+        <ChevronDown size={16} aria-hidden="true" className={more ? 'flip' : ''} />
+        {more ? 'Weniger Angaben' : `Schlaf und Training: ${sleepText}, ${trainText}`}
+      </button>
+
+      {more && (
+        <>
       {sleep.source === 'overload' ? (
         <p className="hint">Schlaf aus Overload: {hoursLabel(sleep.hours ?? 0)}.</p>
       ) : (
@@ -202,6 +217,8 @@ export function ConcentrationCard({ plannedMin }: { plannedMin: number }) {
       ) : ratio.known ? (
         <p className="hint">Das 7:28-Verhältnis zeigt Overload erst nach etwa 14 Tagen mit Einheiten. Bis dahin zählt nur das Training von heute.</p>
       ) : null}
+        </>
+      )}
     </div>
   );
 }

@@ -7,6 +7,7 @@ import {
   buildQueue,
   buildTest,
   cardStats,
+  estimateCardMinutes,
   fold,
   isNewCard,
   isTypable,
@@ -19,7 +20,8 @@ import {
   type TestQuestion,
 } from '@study/core';
 import { BookOpen, Brain, CheckSquare, ChevronDown, ClipboardCheck, ListChecks, PenLine, Plus, Puzzle, Search, Trash2, X, type LucideIcon } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CardForm } from '../components/CardForm';
 import { StudyBrowse } from '../components/cards/StudyBrowse';
 import { StudyChoice } from '../components/cards/StudyChoice';
@@ -33,7 +35,7 @@ import { uid } from '../lib/format';
 import { useStore } from '../state/store';
 
 type Session =
-  | { mode: 'review'; cards: Flashcard[] }
+  | { mode: 'review'; cards: Flashcard[]; mini?: number; round?: number }
   | { mode: 'browse'; cards: Flashcard[] }
   | { mode: 'write'; cards: Flashcard[] }
   | { mode: 'choice'; cards: Flashcard[] }
@@ -128,6 +130,9 @@ function ModeTile({ icon: Icon, title, text, meta, disabled, onClick }: { icon: 
 export function Cards() {
   const { state, dispatch } = useStore();
   const today = toIsoDate(new Date());
+  const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const fromHome = useRef(params.get('von') === 'heute');
   const [filter, setFilter] = useState<string | null>(null); // null = alle Fächer
   const [diffFilter, setDiffFilter] = useState<Difficulty | null>(null); // null = alle Stufen
   const [session, setSession] = useState<Session | null>(null);
@@ -172,6 +177,26 @@ export function Cards() {
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || a.front.localeCompare(b.front, 'de'));
   }, [pool, query]);
 
+  // Kurze Runde von Heute oder aus einer Erinnerung: /karten?runde=5 startet gleich mit den fälligen Karten
+  const roundParam = params.get('runde');
+  const handledRound = useRef(false);
+  useEffect(() => {
+    if (roundParam === null || handledRound.current) return;
+    handledRound.current = true;
+    const n = Math.min(CONFIG.cards.maxPerSession, Math.max(1, Math.round(Number(roundParam)) || CONFIG.daily.miniRoundCards));
+    const cards = buildQueue(state.cards, today, { max: n });
+    if (cards.length > 0) setSession({ mode: 'review', cards, mini: n, round: 0 });
+    setParams({}, { replace: true });
+  }, [roundParam, state.cards, today, setParams]);
+
+  const closeSession = () => {
+    setSession(null);
+    if (fromHome.current) {
+      fromHome.current = false;
+      navigate('/');
+    }
+  };
+
   const start = (mode: Session['mode']) => {
     if (mode === 'review') return setSession({ mode, cards: queue });
     if (mode === 'browse') return setSession({ mode, cards: pool });
@@ -205,10 +230,20 @@ export function Cards() {
   };
 
   if (session) {
-    const close = () => setSession(null);
+    const close = closeSession;
+    const miniMore = (() => {
+      if (session.mode !== 'review' || !session.mini) return undefined;
+      const n = session.mini;
+      const left = buildQueue(state.cards, today, { max: n });
+      if (left.length === 0) return undefined;
+      return {
+        label: `Noch ${left.length} ${left.length === 1 ? 'Karte' : 'Karten'}`,
+        run: () => setSession({ mode: 'review', cards: left, mini: n, round: (session.round ?? 0) + 1 }),
+      };
+    })();
     return (
       <div className="stack" style={{ gap: 20 }} data-no-reload>
-        {session.mode === 'review' && <StudyReview queue={session.cards} subjects={state.subjects} onClose={close} />}
+        {session.mode === 'review' && <StudyReview key={session.round ?? 0} queue={session.cards} subjects={state.subjects} onClose={close} more={miniMore} />}
         {session.mode === 'browse' && <StudyBrowse cards={session.cards} subjects={state.subjects} onClose={close} />}
         {session.mode === 'write' && <StudyWrite cards={session.cards} subjects={state.subjects} onClose={close} />}
         {session.mode === 'choice' && <StudyChoice cards={session.cards} pool={state.cards} subjects={state.subjects} onClose={close} />}
@@ -291,7 +326,7 @@ export function Cards() {
                 <p className="hint">
                   {queue.length === 0
                     ? 'Heute ist nichts fällig.'
-                    : `heute dran (${stats.due} Wiederholungen, ${Math.min(stats.fresh, CONFIG.cards.maxNewPerSession)} neue)`}
+                    : `heute dran (${stats.due} Wiederholungen, ${Math.min(stats.fresh, CONFIG.cards.maxNewPerSession)} neue), ca. ${estimateCardMinutes(queue.length)} min`}
                 </p>
               </div>
               <button type="button" className="btn btn-primary" disabled={queue.length === 0} onClick={() => start('review')}>

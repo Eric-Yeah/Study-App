@@ -1,13 +1,16 @@
 import { toIsoDate } from '@study/core';
 import { Pause, Play, RotateCcw, SkipForward } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { PlainSlider } from '../components/PlainSlider';
 import { ProgressRing } from '../components/ProgressRing';
 import { formatClock, formatMinutes } from '../lib/format';
+import { likelySubjectId, nextUpFor } from '../state/daily';
 import { learnedMinutesOn } from '../state/selectors';
 import { useStore } from '../state/store';
 import { useTimer } from '../timer/TimerProvider';
 import { PHASE_LABELS } from '../timer/types';
+
+const PRESETS = [15, 25, 45, 60];
 
 export function Focus() {
   const { state, dispatch } = useStore();
@@ -17,6 +20,24 @@ export function Focus() {
   const running = t.status === 'running';
   const learned = learnedMinutesOn(state.sessions, toIsoDate(new Date()));
   const round = (t.completedFocus % state.timer.sessionsUntilLongBreak) + (t.phase === 'focus' ? 1 : 0);
+
+  // Fach vorwählen, wenn noch keins gewählt ist: das Fach aus dem Tagesplan, sonst die laufende Stunde oder das zuletzt gelernte Fach
+  const preselected = useRef(false);
+  useEffect(() => {
+    if (preselected.current) return;
+    preselected.current = true;
+    if (t.status !== 'idle' || t.phase !== 'focus' || t.subjectId) return;
+    const now = new Date();
+    const { next } = nextUpFor(state, now);
+    const fromPlan = next.kind === 'study' || next.kind === 'free' || (next.kind === 'task' && next.subjectId) ? next.subjectId : null;
+    const pick = fromPlan ?? likelySubjectId(state, now);
+    if (pick && subjects.some((s) => s.id === pick)) timer.setSubject(pick);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const minutes = Math.round(t.durationMs / 60_000);
+  const canPick = t.status === 'idle' && t.phase === 'focus';
+  const lengths = [...new Set([...PRESETS, state.timer.focusMin])].sort((a, b) => a - b);
 
   // Leertaste startet und pausiert den Timer (außer beim Tippen).
   useEffect(() => {
@@ -48,6 +69,15 @@ export function Focus() {
             </button>
           ))}
         </div>
+        {canPick && (
+          <div className="row" style={{ flexWrap: 'wrap', justifyContent: 'center', gap: 8 }} role="group" aria-label="Länge dieser Runde">
+            {lengths.map((m) => (
+              <button key={m} type="button" className="chip" aria-pressed={minutes === m} onClick={() => timer.setLength(m)}>
+                {m} min
+              </button>
+            ))}
+          </div>
+        )}
         <ProgressRing progress={timer.progress} size={260}>
           <span className="big-num" style={{ fontSize: 56 }} aria-live="off">
             {formatClock(timer.remainingMs)}

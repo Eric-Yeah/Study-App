@@ -1,4 +1,4 @@
-import { CONFIG, addDays, toIsoDate, type PushDay, type PushExam } from '@study/core';
+import { CONFIG, addDays, buildQueue, toIsoDate, type PushDay, type PushExam } from '@study/core';
 import { blocksForDate, combinedPlan, examsWithPlans, learnedForExam, realityFor, upcoming } from '../state/selectors';
 import type { AppState } from '../state/store';
 
@@ -11,7 +11,7 @@ export function pushInputFrom(state: AppState, now: Date): { today: string; days
     const date = addDays(today, i);
     const bySubject = new Map<string, number>();
     for (const b of blocksForDate(plan, list, date)) bySubject.set(b.item.subject.name, (bySubject.get(b.item.subject.name) ?? 0) + b.minutes);
-    return { date, blocks: [...bySubject.entries()].map(([subject, minutes]) => ({ subject, minutes })) };
+    return { date, blocks: [...bySubject.entries()].map(([subject, minutes]) => ({ subject, minutes })), cards: buildQueue(state.cards, date).length };
   });
   const exams: PushExam[] = upcoming(list).map((x) => {
     const reality = realityFor(state, x, now);

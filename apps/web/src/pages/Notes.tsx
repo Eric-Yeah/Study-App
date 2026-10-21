@@ -305,8 +305,16 @@ const listsOf = (n: LessonNote): Record<ListKey, string> => ({
 function NotesTab() {
   const { state } = useStore();
   const today = toIsoDate(new Date());
+  const [params, setParams] = useSearchParams();
 
   const [open, setOpen] = useState(false);
+  // /notizen?neu=1 (zum Beispiel aus dem Schnell-hinzufügen-Fenster) öffnet gleich das Hochladen
+  const wantsNew = params.get('neu') === '1';
+  useEffect(() => {
+    if (!wantsNew) return;
+    setOpen(true);
+    setParams({}, { replace: true });
+  }, [wantsNew, setParams]);
   const [fresh, setFresh] = useState<string | null>(null);
   const [created, setCreated] = useState<Created | null>(null);
   const access = useAccess();

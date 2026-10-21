@@ -44,8 +44,8 @@ export function PracticeView() {
     return (
       <div className="card stack">
         <p className="muted">Diese Übungsklausur gibt es nicht mehr.</p>
-        <Link className="btn" to="/notizen?ansicht=klausuren">
-          Zu den Klausuren
+        <Link className="btn" to="/korrektur/uebung">
+          Zu den Übungsklausuren
         </Link>
       </div>
     );
@@ -104,7 +104,7 @@ export function PracticeView() {
   const remove = () => {
     if (!window.confirm('Diese Übungsklausur löschen? Korrekturen deiner Lösungen bleiben erhalten.')) return;
     dispatch({ type: 'deletePractice', id: practice.id });
-    navigate('/notizen?ansicht=klausuren', { replace: true });
+    navigate('/korrektur/uebung', { replace: true });
   };
 
   const pdfButtons = (kind: 'klausur' | 'erwartung', disabled: boolean) => (
@@ -127,8 +127,8 @@ export function PracticeView() {
             {subject?.name ?? 'Ohne Fach'} · Stufe {levelLabel} · {formatDateShort(date)} · {practice.durationMin} Minuten · {num(content.gesamt_be)} BE
           </p>
         </div>
-        <Link className="btn" to="/notizen?ansicht=klausuren">
-          <ArrowLeft size={16} aria-hidden="true" /> Klausuren
+        <Link className="btn" to="/korrektur/uebung">
+          <ArrowLeft size={16} aria-hidden="true" /> Übungsklausuren
         </Link>
       </div>
 

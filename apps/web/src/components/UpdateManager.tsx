@@ -5,7 +5,7 @@ import { APP_VERSION } from '../releaseNotes';
 
 const TRY_KEY = 'study-app-update-try'; // Schleifenschutz: dieselbe Version nicht öfter als alle 10 Minuten automatisch laden
 const MIN_CHECK_MS = 2 * 60_000;
-const SKIP_ROUTES = /^\/(klausur|korrektur|import|start)/; // dort liegen Entwürfe, Uploads oder Passwörter, nicht mitten drin neu laden
+const SKIP_ROUTES = /^\/(klausur\/|korrektur|import|start)/; // dort liegen Entwürfe, Uploads oder Passwörter, nicht mitten drin neu laden
 
 function recentlyTried(version: string): boolean {
   try {

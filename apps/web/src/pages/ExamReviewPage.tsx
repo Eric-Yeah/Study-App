@@ -104,7 +104,7 @@ export function ExamReviewPage() {
     return (
       <div className="card stack">
         <p className="muted">Diese Korrektur gibt es nicht mehr.</p>
-        <Link className="btn" to="/notizen?ansicht=klausuren">
+        <Link className="btn" to="/korrektur">
           Zu den Klausuren
         </Link>
       </div>
@@ -167,7 +167,7 @@ export function ExamReviewPage() {
     if (!window.confirm('Diese Korrektur löschen?')) return;
     await removeExamFiles(review.id).catch(() => {});
     dispatch({ type: 'deleteReview', id: review.id });
-    navigate('/notizen?ansicht=klausuren', { replace: true });
+    navigate('/korrektur', { replace: true });
   };
 
   const bar = busy && progress && (
@@ -190,7 +190,7 @@ export function ExamReviewPage() {
             {review.quarter ? ` · ${review.quarter}` : ''}
           </p>
         </div>
-        <Link className="btn" to="/notizen?ansicht=klausuren">
+        <Link className="btn" to="/korrektur">
           <ArrowLeft size={16} aria-hidden="true" /> Klausuren
         </Link>
       </div>

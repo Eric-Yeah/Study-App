@@ -1,14 +1,11 @@
 import { QUARTERS, folderFileName, formatBytes, groupNotesByWeek, highlightRanges, isQuarter, searchNotes, searchTokens, pdfFileName, toIsoDate, type Quarter, type Subject, type WorksheetPage, type WorksheetSummary } from '@study/core';
 import { ChevronDown, Download, FolderDown, Search, Trash2, Upload, X } from 'lucide-react';
-import { Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { formatDateShort, formatNoteDay, formatWeekLabel } from '../lib/format';
 import { budgetUsedShare, downloadDocument, dropImagesIfSure, noteImagePaths, removeDocument, removeNoteImages, summarizeWorksheet, WorksheetError } from '../lib/worksheetApi';
 import { AutoTextarea } from '../components/AutoTextarea';
-import { Segmented } from '../components/Segmented';
 import { buildFolder, saveBlob } from '../lib/folderPdf';
-import { Cards } from './Cards';
-import { Corrections } from '../components/exam/Corrections';
-import { useSearchParams } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { NoteUpload, type Created } from './NoteUpload';
 import { useStore, type LessonNote } from '../state/store';
 import { useAccess } from '../lib/access';
@@ -304,8 +301,8 @@ const listsOf = (n: LessonNote): Record<ListKey, string> => ({
   offene_fragen: toLines(n.summary?.offene_fragen ?? []),
 });
 
-/** Die Notizen-Ansicht. `tabs` ist der Umschalter zwischen Notizen und Karteikarten. */
-function NotesTab({ tabs }: { tabs: ReactNode }) {
+/** Die Notizen-Ansicht (Reiter Notizen im Bereich Notizen). */
+function NotesTab() {
   const { state } = useStore();
   const today = toIsoDate(new Date());
 
@@ -401,7 +398,6 @@ function NotesTab({ tabs }: { tabs: ReactNode }) {
           <Upload size={18} aria-hidden="true" /> Blatt hochladen
         </button>
       </div>
-      {tabs}
 
       {open && (
         <NoteUpload
@@ -564,32 +560,11 @@ function NotesTab({ tabs }: { tabs: ReactNode }) {
   );
 }
 
-type Tab = 'notizen' | 'karten' | 'klausuren';
-const TABS: readonly Tab[] = ['notizen', 'karten', 'klausuren'];
-
+/** Notizen. Die alten Adressen /notizen?ansicht=karten und ?ansicht=klausuren führen zu den neuen Seiten. */
 export function Notes() {
-  const { state } = useStore();
-  const access = useAccess();
-  // Den Bereich Klausuren gibt es nur mit Korrektur oder Übungsklausuren, oder wenn schon etwas da ist
-  const examsTab = access.can('correct') || access.can('practice') || state.examReviews.length > 0 || state.practiceExams.length > 0;
-  // Die Ansicht steht in der Adresse (?ansicht=klausuren), damit Zurück-Links aus der Korrektur hier wieder landen.
-  const [params, setParams] = useSearchParams();
-  const fromUrl = params.get('ansicht') as Tab | null;
-  const tab: Tab = fromUrl && TABS.includes(fromUrl) && (fromUrl !== 'klausuren' || examsTab) ? fromUrl : 'notizen';
-  const setTab = (t: Tab) => setParams(t === 'notizen' ? {} : { ansicht: t }, { replace: true });
-  const tabs = (
-    <Segmented<Tab>
-      label="Ansicht"
-      value={tab}
-      onChange={setTab}
-      options={[
-        { value: 'notizen', label: 'Notizen' },
-        { value: 'karten', label: 'Karteikarten' },
-        ...(examsTab ? [{ value: 'klausuren' as Tab, label: 'Klausuren' }] : []),
-      ]}
-    />
-  );
-  if (tab === 'karten') return <Cards tabs={tabs} />;
-  if (tab === 'klausuren') return <Corrections tabs={tabs} />;
-  return <NotesTab tabs={tabs} />;
+  const [params] = useSearchParams();
+  const view = params.get('ansicht');
+  if (view === 'karten') return <Navigate to="/karten" replace />;
+  if (view === 'klausuren') return <Navigate to="/korrektur" replace />;
+  return <NotesTab />;
 }

@@ -12,6 +12,23 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '2026.10.21.4',
+    date: '21. Oktober 2026',
+    items: [
+      { icon: '🎨', title: 'Neues Design: klarer und ruhiger', text: 'Eingabefelder, Knöpfe und Auswahl-Chips haben jetzt deutlichere Rahmen und sind besser zu erkennen. Die Farben sind etwas klarer, die Ecken etwas straffer und die Schatten ruhiger, in Hell und Dunkel.' },
+      { icon: '🔎', title: 'Kleine Schrift besser lesbar', text: 'Die kleinsten Beschriftungen in Plan, Stundenplan und Tags sind jetzt 12 statt 10 oder 11 Pixel groß.' },
+    ],
+  },
+  {
+    version: '2026.10.21.3',
+    date: '21. Oktober 2026',
+    items: [
+      { icon: '🧭', title: 'Neu sortiert: alles auf einen Blick', text: 'Die untere Leiste hat jetzt sechs Bereiche: Heute, Fokus, Plan, Notizen, Klausuren und Noten. Die Einstellungen findest du am Handy oben rechts als Zahnrad, am Tablet und Mac unten in der Seitenleiste.' },
+      { icon: '🗂️', title: 'Reiter in jedem Bereich', text: 'Plan, Rückblick und Lanis sind Reiter im Bereich Plan. Notizen und Karteikarten gehören zusammen, ebenso Noten, Abiturrechner und Fächer. Der Bereich in der Leiste bleibt aktiv, auch wenn du eine Unterseite wie eine Korrektur offen hast.' },
+      { icon: '📋', title: 'Klausuren als eigener Bereich', text: 'Termine mit Lernfortschritt, Korrekturen mit den Korrekturmustern, Übungsklausuren mit dem Aufgabenstil und die Schwächen-Auswertung haben jetzt einen eigenen Platz. Im Plan führt eine Karte zu den Klausuren. Alte Links funktionieren weiter.' },
+    ],
+  },
+  {
     version: '2026.10.21.2',
     date: '21. Oktober 2026',
     items: [

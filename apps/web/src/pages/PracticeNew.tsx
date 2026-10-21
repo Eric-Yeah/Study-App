@@ -113,7 +113,7 @@ export function PracticeNew() {
           <h1>Übungsklausur erstellen</h1>
           <p className="sub">Die KI schreibt eine Klausur wie im Unterricht: mit Operatoren, passend zu deinem Material, als PDF mit Erwartungshorizont.</p>
         </div>
-        <Link className="btn" to="/notizen?ansicht=klausuren">
+        <Link className="btn" to="/korrektur/uebung">
           <ArrowLeft size={16} aria-hidden="true" /> Zurück
         </Link>
       </div>

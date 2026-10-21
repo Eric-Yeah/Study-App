@@ -5,9 +5,10 @@ import { Link } from 'react-router-dom';
 import { useAccess } from '../lib/access';
 
 /** Seiten, die eine KI-Funktion brauchen. Ohne Freischaltung ein freundlicher Hinweis statt der Seite. */
-export function RequireAi({ feature, children }: { feature: AiFeature; children: ReactNode }) {
+/** alsoIf: auch ohne Freischaltung zeigen, wenn schon eigene Daten da sind (zum Beispiel korrigierte Klausuren). */
+export function RequireAi({ feature, alsoIf = false, children }: { feature: AiFeature; alsoIf?: boolean; children: ReactNode }) {
   const access = useAccess();
-  if (access.can(feature)) return <>{children}</>;
+  if (alsoIf || access.can(feature)) return <>{children}</>;
   return (
     <div className="card empty stack" style={{ gap: 10 }}>
       <Lock size={28} aria-hidden="true" />

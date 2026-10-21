@@ -55,7 +55,7 @@ export function Weaknesses() {
           <h1>Schwächen</h1>
           <p className="sub">Wo dir in den korrigierten Klausuren Punkte fehlen, nach Operator und Anforderungsbereich. Gerechnet aus den gespeicherten Korrekturen, ohne KI und ohne Kosten.</p>
         </div>
-        <Link className="btn" to="/notizen?ansicht=klausuren">
+        <Link className="btn" to="/korrektur">
           <ArrowLeft size={16} aria-hidden="true" /> Zurück
         </Link>
       </div>

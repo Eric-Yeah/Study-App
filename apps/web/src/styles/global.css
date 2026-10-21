@@ -2000,6 +2000,18 @@ mark {
   border-radius: 2px;
   background: var(--line);
 }
+/* Schmale Handys: nur der aktuelle Schritt behält seinen Namen, sonst läuft die Leiste über den Rand */
+@media (max-width: 460px) {
+  .stepper {
+    flex-wrap: wrap;
+  }
+  .step:not(.current) .step-label {
+    display: none;
+  }
+  .step + .step::before {
+    width: 16px;
+  }
+}
 .step-dot {
   display: inline-flex;
   align-items: center;
@@ -3251,4 +3263,29 @@ a.chip {
 }
 .admin-account-main > * {
   overflow-wrap: anywhere;
+}
+
+/* Ältere Browser ohne color-mix (vor Safari 16.2 und Chrome 111): einfache Ersatzfarben aus den Tokens, sonst fehlen Balken und Markierungen */
+@supports not (background: color-mix(in srgb, red, blue)) {
+  .bar > i {
+    background: var(--accent);
+  }
+  .block-pill,
+  .tt-cell,
+  .diff-pill[aria-pressed='true'],
+  .diff-tag,
+  .deck[aria-pressed='true'] {
+    background: var(--accent-soft);
+  }
+  .tag.danger,
+  .btn-danger:hover:not(:disabled),
+  .answer-box.bad,
+  .choice-btn.wrong,
+  .match-tile.wrong {
+    background: var(--surface-2);
+    border-color: var(--danger);
+  }
+  .notice {
+    border-color: var(--line);
+  }
 }

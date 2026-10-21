@@ -75,7 +75,8 @@ export function PracticeView() {
         saveBlob(blob, practiceFileName(date, info.subject, levelLabel, kind));
       } else {
         const url = URL.createObjectURL(blob);
-        if (!window.open(url, '_blank', 'noopener')) saveBlob(blob, practiceFileName(date, info.subject, levelLabel, kind)); // Pop-up gesperrt
+        // Ohne "noopener": damit liefert window.open nur dann null, wenn das Pop-up wirklich gesperrt ist (sonst käme zusätzlich ein Download)
+        if (!window.open(url, '_blank')) saveBlob(blob, practiceFileName(date, info.subject, levelLabel, kind)); // Pop-up gesperrt
         window.setTimeout(() => URL.revokeObjectURL(url), 120_000);
       }
     } catch (e) {

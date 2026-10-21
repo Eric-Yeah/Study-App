@@ -10,6 +10,7 @@ import { PracticeView } from './pages/PracticeView';
 import { RubricPage } from './pages/RubricPage';
 import { Weaknesses } from './pages/Weaknesses';
 import { Abitur } from './pages/Abitur';
+import { Grades } from './pages/Grades';
 import { StylePage } from './pages/StylePage';
 import { Focus } from './pages/Focus';
 import { LanisImport } from './pages/LanisImport';
@@ -130,6 +131,7 @@ export function App() {
               <Route path="rueckblick" element={<Review />} />
               <Route path="faecher" element={<Subjects />} />
               <Route path="abitur" element={<Abitur />} />
+              <Route path="noten" element={<Grades />} />
               <Route path="einstellungen" element={<Settings />} />
               <Route path="import" element={<LanisImport />} />
               <Route path="klausur/neu" element={<ExamEditor key="new" />} />

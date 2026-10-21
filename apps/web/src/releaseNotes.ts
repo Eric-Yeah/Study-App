@@ -12,6 +12,16 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '2026.10.21.1',
+    date: '21. Oktober 2026',
+    items: [
+      { icon: '📝', title: 'Noten: mehr als die Halbjahresnote', text: 'Unter Fächer → Noten trägst du jetzt jede einzelne Note ein: Klausuren, mündliche Mitarbeit, Tests, Referate, Hausaufgaben und Projekte, mit Datum, Punkten und Gewicht. Daraus berechnet die App deine Kursnote je Halbjahr (Q1 bis Q4).' },
+      { icon: '⚖️', title: 'Klausuren und Mündliches gewichten', text: 'Wie Klausuren und sonstige Leistungen zählen, entscheidet deine Lehrkraft. Stell das Verhältnis pro Fach ein (Standard 50 : 50). Gibt es nur eine Gruppe, zählt allein sie.' },
+      { icon: '🎯', title: 'Was brauche ich?', text: 'Wähle eine Zielnote für den Kurs, die App sagt dir, wie viele Punkte du in der nächsten Klausur oder mündlichen Leistung mindestens brauchst. Dazu Trend, Schnitt und ein Hinweis bei Kursen unter 5 Punkten.' },
+      { icon: '🎓', title: 'Weiter in den Abiturrechner', text: 'Ein Tipp übernimmt deine Kursnoten in den Abiturrechner. Vergangene Klausuren aus dem Plan ohne Note erinnern dich ans Eintragen, und den Notenstand eines Fachs kannst du aus den Einzelnoten übernehmen.' },
+    ],
+  },
+  {
     version: '2026.10.11.1',
     date: '11. Oktober 2026',
     items: [

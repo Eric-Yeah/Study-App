@@ -65,6 +65,7 @@ textarea {
   display: none;
 }
 .main {
+  min-width: 0; /* als Grid-Element nicht breiter werden als der Platz, sonst schiebt eine Chip-Reihe die Seite auseinander */
   width: 100%;
   max-width: 1100px;
   margin: 0 auto;
@@ -244,6 +245,16 @@ textarea {
 }
 .btn:hover {
   background: var(--surface-2);
+}
+.btn:disabled,
+.chip:disabled,
+.diff-pill:disabled,
+.link-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: none;
+  transform: none;
+  box-shadow: none;
 }
 .btn-primary {
   background: var(--accent);
@@ -1264,6 +1275,27 @@ select.input.agenda-select {
   .check {
     width: 28px;
     height: 28px;
+    position: relative;
+  }
+  /* Unsichtbare Tippfläche von 44 px um den kleinen Kreis */
+  .check::after {
+    content: '';
+    position: absolute;
+    inset: -8px;
+  }
+  .diff-pill,
+  .day-adjust,
+  .note-week-head,
+  .link-btn {
+    min-height: 44px;
+  }
+  .link-btn {
+    display: inline-flex;
+    align-items: center;
+  }
+  summary {
+    padding-block: 12px;
+    cursor: pointer;
   }
 }
 button,
@@ -1289,7 +1321,8 @@ label {
   font-weight: 600;
 }
 .bottom-nav {
-  grid-template-columns: repeat(6, 1fr);
+  /* "Einstellungen" ist das längste Wort und wird sonst auf schmalen Handys abgeschnitten */
+  grid-template-columns: repeat(5, 1fr) 1.4fr;
 }
 .note-filter {
   flex-wrap: nowrap;
@@ -1971,6 +2004,18 @@ mark {
   margin-right: 4px;
   border-radius: 2px;
   background: var(--line);
+}
+/* Schmale Handys: nur der aktuelle Schritt behält seinen Namen, sonst läuft die Leiste über den Rand */
+@media (max-width: 460px) {
+  .stepper {
+    flex-wrap: wrap;
+  }
+  .step:not(.current) .step-label {
+    display: none;
+  }
+  .step + .step::before {
+    width: 16px;
+  }
 }
 .step-dot {
   display: inline-flex;
@@ -3223,4 +3268,29 @@ a.chip {
 }
 .admin-account-main > * {
   overflow-wrap: anywhere;
+}
+
+/* Ältere Browser ohne color-mix (vor Safari 16.2 und Chrome 111): einfache Ersatzfarben aus den Tokens, sonst fehlen Balken und Markierungen */
+@supports not (background: color-mix(in srgb, red, blue)) {
+  .bar > i {
+    background: var(--accent);
+  }
+  .block-pill,
+  .tt-cell,
+  .diff-pill[aria-pressed='true'],
+  .diff-tag,
+  .deck[aria-pressed='true'] {
+    background: var(--accent-soft);
+  }
+  .tag.danger,
+  .btn-danger:hover:not(:disabled),
+  .answer-box.bad,
+  .choice-btn.wrong,
+  .match-tile.wrong {
+    background: var(--surface-2);
+    border-color: var(--danger);
+  }
+  .notice {
+    border-color: var(--line);
+  }
 }

@@ -1,4 +1,5 @@
 import { CONFIG, fitOnA4, fitWithin } from '@study/core';
+import { decodeImage, type DecodedImage } from './decodeImage';
 
 export interface MergedPdf {
   blob: Blob;
@@ -9,9 +10,9 @@ const isPdf = (f: File) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name
 
 /** Foto als JPEG für das PDF: Ausrichtung übernehmen, längste Kante höchstens CONFIG.pdf.imageEdge, weißer Hintergrund. */
 async function photoToJpeg(file: File): Promise<{ bytes: Uint8Array; width: number; height: number }> {
-  let bitmap: ImageBitmap;
+  let bitmap: DecodedImage;
   try {
-    bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    bitmap = await decodeImage(file, { fromImage: true });
   } catch {
     throw new Error(`„${file.name}“ konnte nicht gelesen werden. Nimm ein JPEG, PNG oder eine PDF.`);
   }
@@ -24,7 +25,7 @@ async function photoToJpeg(file: File): Promise<{ bytes: Uint8Array; width: numb
     if (!ctx) throw new Error('Das Bild konnte nicht verarbeitet werden.');
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, width, height);
-    ctx.drawImage(bitmap, 0, 0, width, height);
+    ctx.drawImage(bitmap.source, 0, 0, width, height);
     const blob = await new Promise<Blob>((resolve, reject) =>
       canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Das Bild konnte nicht umgewandelt werden.'))), 'image/jpeg', CONFIG.pdf.imageQuality),
     );

@@ -11,6 +11,8 @@ export interface TimerState {
   completedFocus: number;
   updatedAt: number;
   deviceId: string;
+  /** Kennung dieser Phase (bleibt bei Pause und Fortsetzen gleich). Damit speichern alle Geräte dieselbe Session unter derselben ID, ohne sie doppelt zu zählen. Ältere Stände haben sie nicht. */
+  runId?: string | null;
 }
 
 export const PHASE_LABELS: Record<TimerPhase, string> = {

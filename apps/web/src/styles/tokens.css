@@ -12,7 +12,7 @@
   --surface-2: #f5f7fa;
   --ink: #162033;
   --ink-2: #566176;
-  --ink-3: #8a93a6;
+  --ink-3: #646d82; /* Kontrast mindestens 4,5:1 auf Hintergrund und Karten */
   --line: #dfe4ec;
   --accent: #3f51e0;
   --accent-soft: #e6e9fc;
@@ -33,7 +33,7 @@
   --surface-2: #1e2436;
   --ink: #edf0f7;
   --ink-2: #a2aabd;
-  --ink-3: #727b90;
+  --ink-3: #8d96ab;
   --line: #2a3145;
   --accent: #8c9bff;
   --accent-soft: #252c55;
@@ -55,7 +55,7 @@
     --surface-2: #1e2436;
     --ink: #edf0f7;
     --ink-2: #a2aabd;
-    --ink-3: #727b90;
+    --ink-3: #8d96ab;
     --line: #2a3145;
     --accent: #8c9bff;
     --accent-soft: #252c55;

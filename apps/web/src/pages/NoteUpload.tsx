@@ -305,7 +305,7 @@ export function NoteUpload({ onCreated, onSettled }: { onCreated: (c: Created) =
     const changed = !isUnchanged(edits, built.pages);
     const shown = finalPdf ?? built;
     return (
-      <div className="card stack doc-confirm upload-card">
+      <div className="card stack doc-confirm upload-card" data-no-reload>
         <Stepper step={busy ? 3 : 2} />
         <div className="doc-head">
           <span className="doc-icon" aria-hidden="true">
@@ -385,13 +385,13 @@ export function NoteUpload({ onCreated, onSettled }: { onCreated: (c: Created) =
   const canBuild = subjectId !== '' && quarter !== '' && files.length > 0 && !busy;
   if (state.subjects.length === 0) {
     return (
-      <div className="card stack upload-card">
+      <div className="card stack upload-card" data-no-reload>
         <p className="muted">Lege zuerst unter Fächer ein Fach an.</p>
       </div>
     );
   }
   return (
-    <div className="card stack upload-card">
+    <div className="card stack upload-card" data-no-reload>
       <Stepper step={1} />
 
       <section className="stack upload-section">

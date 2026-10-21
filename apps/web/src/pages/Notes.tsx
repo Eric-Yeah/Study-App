@@ -235,6 +235,7 @@ function NoteCard({
                 onChange={(e) => {
                   setQuarter(isQuarter(e.target.value) ? e.target.value : '');
                 }}
+                onBlur={save}
               >
                 <option value="">–</option>
                 {QUARTERS.map((q) => (

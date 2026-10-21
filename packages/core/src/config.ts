@@ -254,6 +254,22 @@ export const CONFIG = {
     examLeadDays: [7, 3, 1] as number[], // so viele Tage vor einer Klausur kommt die Erinnerung
     maxSubjects: 4, // Fächer im Text des Tagesplans
     syncDelayMs: 4000, // so lange nach der letzten Änderung wird die Warteschlange erneuert
+    streakTime: '19:00', // "Serie halten": nur wenn heute noch nichts gelernt wurde, wird bei jeder Änderung neu berechnet
+  },
+  daily: {
+    // Alltag: Jetzt lernen, Serie mit Gnade, Wochenstreifen, Kartenrunde, Tagesabschluss (daily.ts)
+    streakMinMinutes: 10, // ab so vielen Minuten Fokus zählt ein Tag
+    streakMinCards: 5, // oder so viele geübte Karten
+    streakMinTasks: 1, // oder so viele erledigte Aufgaben
+    graceEveryDays: 7, // ein einzelner Ausfalltag wird verziehen, danach erst nach so vielen Tagen wieder
+    lookbackDays: 120, // so weit zurück wird die Serie gerechnet
+    streakNudgeMinDays: 3, // Erinnerung am Abend erst ab einer Serie von so vielen Tagen
+    quickRoundCards: 10, // Karten in der kurzen Runde auf Heute
+    quickRoundNew: 3, // davon höchstens so viele neue
+    secondsPerCard: 12, // Schätzung für die Dauer der Runde
+    focusPresets: [15, 25, 45, 60] as number[], // Schnellwahl der Fokus-Länge
+    eveningFromHour: 17, // ab dieser Uhrzeit erscheint der Tagesabschluss
+    carryDays: 7, // offene Aufgaben der letzten Tage tauchen auf Heute wieder auf (danach gelten sie als erledigt vergessen)
   },
   style: {
     // Stil der echten Aufgabenblätter lernen (Edge Function learn-style, Haiku, Kosten ein bis drei Cent je Blatt)

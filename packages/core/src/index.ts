@@ -30,3 +30,4 @@ export * from './taskStyle';
 export * from './pushPlan';
 export * from './access';
 export * from './grades';
+export * from './daily';

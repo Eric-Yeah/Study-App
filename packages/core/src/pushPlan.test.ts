@@ -105,3 +105,23 @@ describe('Klausur naht und Rückstand', () => {
     expect(buildPushItems({ ...base, exams: [exam()], prefs: prefs({ plan: false, exam: false }) })).toEqual([]);
   });
 });
+
+describe('Karten und Serie', () => {
+  it('nennt fällige Karten nur im Tagesplan von heute', () => {
+    const items = buildPushItems({ ...base, exams: [], prefs: prefs({ exam: false }), cardsDue: 12 });
+    expect(items.find((i) => i.title.startsWith('Heute'))!.body).toContain('Dazu 12 Karten zum Üben.');
+    expect(items.find((i) => i.title.startsWith('Morgen'))!.body).not.toContain('Karten');
+  });
+  it('erinnert abends an die Serie, solange heute nichts passiert ist', () => {
+    const items = buildPushItems({ ...base, exams: [], prefs: prefs(), streak: { current: 5, todayDone: false } });
+    const nudge = items.find((i) => i.title.startsWith('Deine Serie'))!;
+    expect(nudge.title).toBe('Deine Serie: 5 Tage');
+    expect(hhmm(nudge.dueAt)).toBe('19:00');
+  });
+  it('keine Erinnerung bei kurzer Serie, erledigtem Tag oder ausgeschaltetem Tagesplan', () => {
+    const titles = (o: Partial<Parameters<typeof buildPushItems>[0]>) => buildPushItems({ ...base, exams: [], prefs: prefs(), ...o }).map((i) => i.title);
+    expect(titles({ streak: { current: 2, todayDone: false } }).some((t) => t.startsWith('Deine Serie'))).toBe(false);
+    expect(titles({ streak: { current: 9, todayDone: true } }).some((t) => t.startsWith('Deine Serie'))).toBe(false);
+    expect(titles({ streak: { current: 9, todayDone: false }, prefs: prefs({ plan: false }) }).some((t) => t.startsWith('Deine Serie'))).toBe(false);
+  });
+});

@@ -86,7 +86,17 @@ const inDays = (n: number) => (n === 0 ? 'heute' : n === 1 ? 'morgen' : `in ${n}
  * morgen (danach ändert sich der Plan zu oft), "Klausur naht" 7, 3 und 1 Tag vorher, "Rückstand" nur heute Abend für die dringendste
  * Klausur. Jede Mitteilung enthält nur, was für den Tag stimmt.
  */
-export function buildPushItems(input: { now: Date; today: string; days: PushDay[]; exams: PushExam[]; prefs: PushPrefs }): PushItem[] {
+export function buildPushItems(input: {
+  now: Date;
+  today: string;
+  days: PushDay[];
+  exams: PushExam[];
+  prefs: PushPrefs;
+  /** Karten, die heute fällig sind (kommt in den Tagesplan von heute). */
+  cardsDue?: number;
+  /** Serie: erinnert am Abend (CONFIG.push.streakTime), wenn heute noch nichts passiert ist. Gehört zum Schalter "Tagesplan". */
+  streak?: { current: number; todayDone: boolean };
+}): PushItem[] {
   const { now, today, days, exams, prefs } = input;
   const out: PushItem[] = [];
   const future = (d: Date) => d.getTime() > now.getTime() + 30_000;
@@ -108,8 +118,22 @@ export function buildPushItems(input: { now: Date; today: string; days: PushDay[
       } else if (total > 0 && day) {
         const subjects = day.blocks.slice(0, CONFIG.push.maxSubjects).map((b) => `${b.subject} ${pushMinutes(b.minutes)}`);
         const more = day.blocks.length > CONFIG.push.maxSubjects ? ` und ${day.blocks.length - CONFIG.push.maxSubjects} weitere` : '';
-        out.push({ kind: 'plan', dueAt: due.toISOString(), title: `${label}: ${pushMinutes(total)} lernen`, body: `${subjects.join(' · ')}${more}.${nextLine}`, url: '/' });
+        const cards = i === 0 && (input.cardsDue ?? 0) > 0 ? ` Dazu ${input.cardsDue} ${input.cardsDue === 1 ? 'Karte' : 'Karten'} zum Üben.` : '';
+        out.push({ kind: 'plan', dueAt: due.toISOString(), title: `${label}: ${pushMinutes(total)} lernen`, body: `${subjects.join(' · ')}${more}.${cards}${nextLine}`, url: '/' });
       }
+    }
+  }
+
+  if (prefs.plan && input.streak && !input.streak.todayDone && input.streak.current >= CONFIG.daily.streakNudgeMinDays) {
+    const due = at(today, CONFIG.push.streakTime);
+    if (future(due)) {
+      out.push({
+        kind: 'plan',
+        dueAt: due.toISOString(),
+        title: `Deine Serie: ${input.streak.current} Tage`,
+        body: `Heute zählen schon ${CONFIG.daily.streakMinMinutes} Minuten Fokus oder ${CONFIG.daily.streakMinCards} Karten, dann bleibt sie bestehen.`,
+        url: '/',
+      });
     }
   }
 

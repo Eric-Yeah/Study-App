@@ -1,4 +1,4 @@
-import { CONFIG, examModelAccuracy, formatTokens, formatUsd, usageByMonth, type MonthUsage } from '@study/core';
+import { CONFIG, examModelAccuracy, formatTokens, formatUsd, toIsoDate, usageByMonth, type MonthUsage } from '@study/core';
 import { Copy, RefreshCw, X } from 'lucide-react';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { AdminError, fetchAdminReport, type AdminLogRow, type AdminReport } from '../lib/adminApi';
@@ -67,7 +67,7 @@ function Report({ report, onRefresh, busy }: { report: AdminReport; onRefresh: (
   const used = (thisMonth?.costUsd ?? 0) / CONFIG.ai.monthlyBudgetUsd;
   const log = report.log.filter((r) => !onlyErrors || (r.status !== 'ok' && r.status !== 'unsicher'));
   const accuracy = useMemo(() => examModelAccuracy(state.examReviews, state.subjects), [state.examReviews, state.subjects]);
-  const due = state.cards.filter((c) => c.reps > 0 && c.due <= new Date().toISOString().slice(0, 10)).length;
+  const due = state.cards.filter((c) => c.reps > 0 && c.due <= toIsoDate(new Date())).length;
   let deviceId = '';
   try {
     deviceId = localStorage.getItem('study-app-device-id') ?? '';

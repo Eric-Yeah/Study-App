@@ -294,6 +294,7 @@ export function ExamCorrect() {
               value={horizonText}
               maxLength={CONFIG.exam.maxHorizonChars}
               disabled={busy}
+              aria-label="Erwartungshorizont eintippen"
               placeholder="Oder hier eintippen, zum Beispiel: Aufgabe 1 (10 BE): Einleitung mit Autor, Titel, Thema …"
               onChange={(e) => setHorizonText(e.target.value)}
             />

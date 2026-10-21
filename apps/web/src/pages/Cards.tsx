@@ -207,7 +207,7 @@ export function Cards({ tabs }: { tabs: ReactNode }) {
   if (session) {
     const close = () => setSession(null);
     return (
-      <div className="stack" style={{ gap: 20 }}>
+      <div className="stack" style={{ gap: 20 }} data-no-reload>
         {session.mode === 'review' && <StudyReview queue={session.cards} subjects={state.subjects} onClose={close} />}
         {session.mode === 'browse' && <StudyBrowse cards={session.cards} subjects={state.subjects} onClose={close} />}
         {session.mode === 'write' && <StudyWrite cards={session.cards} subjects={state.subjects} onClose={close} />}

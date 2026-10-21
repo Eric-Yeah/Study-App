@@ -12,13 +12,26 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
-    version: '2026.10.21.1',
+    version: '2026.10.21.2',
     date: '21. Oktober 2026',
     items: [
       { icon: '📝', title: 'Noten: mehr als die Halbjahresnote', text: 'Unter Fächer → Noten trägst du jetzt jede einzelne Note ein: Klausuren, mündliche Mitarbeit, Tests, Referate, Hausaufgaben und Projekte, mit Datum, Punkten und Gewicht. Daraus berechnet die App deine Kursnote je Halbjahr (Q1 bis Q4).' },
       { icon: '⚖️', title: 'Klausuren und Mündliches gewichten', text: 'Wie Klausuren und sonstige Leistungen zählen, entscheidet deine Lehrkraft. Stell das Verhältnis pro Fach ein (Standard 50 : 50). Gibt es nur eine Gruppe, zählt allein sie.' },
       { icon: '🎯', title: 'Was brauche ich?', text: 'Wähle eine Zielnote für den Kurs, die App sagt dir, wie viele Punkte du in der nächsten Klausur oder mündlichen Leistung mindestens brauchst. Dazu Trend, Schnitt und ein Hinweis bei Kursen unter 5 Punkten.' },
       { icon: '🎓', title: 'Weiter in den Abiturrechner', text: 'Ein Tipp übernimmt deine Kursnoten in den Abiturrechner. Vergangene Klausuren aus dem Plan ohne Note erinnern dich ans Eintragen, Noten deiner Lehrkraft aus der Klausurenkorrektur übernimmst du mit einem Tipp, und den Notenstand eines Fachs kannst du aus den Einzelnoten übernehmen.' },
+    ],
+  },
+  {
+    version: '2026.10.21.1',
+    date: '21. Oktober 2026',
+    items: [
+      { icon: '📄', title: 'Gescannte PDFs auch in älteren Browsern', text: 'Gescannte PDFs lassen sich auch in älteren Browsern hochladen und zusammenfassen. Fotos werden ebenfalls auf älteren Geräten richtig gedreht und verkleinert.' },
+      { icon: '⏱️', title: 'Fokus-Zeit geht nicht mehr verloren', text: 'Läuft der Timer auf einem Gerät im Hintergrund weiter, wird die gelernte Zeit jetzt trotzdem gespeichert, auch wenn ein anderes Gerät das Ende der Phase bemerkt.' },
+      { icon: '🔢', title: 'Karten: Zahlen genau prüfen', text: 'Beim Schreiben gilt 1,5 nicht mehr als 15, und eine falsche Ziffer (13,5 statt 12,5) zählt nicht mehr als Tippfehler. Punkt und Komma gelten gleich.' },
+      { icon: '👆', title: 'Besser auf dem Handy', text: 'Die Leiste unten schneidet „Einstellungen“ nicht mehr ab, die Schritte beim Blatt-Hochladen laufen nicht mehr über den Rand, und kleine Knöpfe (Aufgaben abhaken, Plan anpassen, Wochen aufklappen) sind leichter zu treffen. Deaktivierte Knöpfe sehen jetzt auch deaktiviert aus. Auf dem iPad schob ein aufgeklapptes Fach die Seite „Fächer“ seitlich auseinander, das ist behoben.' },
+      { icon: '🔑', title: 'Anmelden', text: 'Beim Anmelden verlangt das Passwortfeld keine Mindestlänge mehr, nur noch beim Erstellen eines Kontos.' },
+      { icon: '🔍', title: 'Besser lesbar', text: 'Graue Hinweistexte haben im hellen und dunklen Design mehr Kontrast.' },
+      { icon: '🛟', title: 'Weniger Datenverlust', text: 'Der Abiturrechner speichert die letzte Eingabe auch, wenn du die Seite sofort verlässt. Beim Hochladen und in der Lernrunde lädt sich die App nicht mehr von selbst neu. Ein leeres Datum im Klausur-Editor macht den Plan nicht mehr kaputt. „PDF ansehen“ lädt die Datei nicht mehr zusätzlich herunter.' },
     ],
   },
   {

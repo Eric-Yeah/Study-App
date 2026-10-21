@@ -210,7 +210,7 @@ export function parsePeriods(v: unknown): number[] {
   const range = /(\d+)\s*-\s*(\d+)/.exec(s);
   if (range) {
     const [a, b] = [Number(range[1]), Number(range[2])];
-    return Array.from({ length: Math.max(0, b - a) + 1 }, (_, i) => a + i);
+    return Array.from({ length: Math.min(20, Math.max(0, b - a)) + 1 }, (_, i) => a + i); // höchstens 21 Stunden, schützt vor absurden Bereichen
   }
   return [...s.matchAll(/\d+/g)].map((m) => Number(m[0]));
 }

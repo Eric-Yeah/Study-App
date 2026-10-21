@@ -243,6 +243,12 @@ export function reducer(state: AppState, action: Action): AppState {
         practiceExams: state.practiceExams.map((p) => (p.subjectId === action.id ? { ...p, subjectId: null } : p)),
         examReviews: state.examReviews.map((r) => (r.subjectId === action.id ? { ...r, subjectId: null } : r)),
         topics: state.topics.filter((t) => state.exams.find((e) => e.id === t.examId)?.subjectId !== action.id),
+        // Wie in der Datenbank: Verknüpfungen werden leer (on delete set null), der Aufgabenstil geht mit
+        tasks: state.tasks.map((t) => (t.subjectId === action.id ? { ...t, subjectId: null } : t)),
+        sessions: state.sessions.map((s) => (s.subjectId === action.id ? { ...s, subjectId: null } : s)),
+        notes: state.notes.map((n) => (n.subjectId === action.id ? { ...n, subjectId: null } : n)),
+        cards: state.cards.map((c) => (c.subjectId === action.id ? { ...c, subjectId: null } : c)),
+        taskStyles: state.taskStyles.filter((t) => t.subjectId !== action.id),
       };
     case 'upsertExam':
       return { ...state, exams: upsert(state.exams, action.exam) };
@@ -260,7 +266,7 @@ export function reducer(state: AppState, action: Action): AppState {
     case 'setTheme':
       return { ...state, theme: action.theme };
     case 'addSession':
-      return { ...state, sessions: [...state.sessions, action.session] };
+      return { ...state, sessions: upsert(state.sessions, action.session) };
     case 'setCheckin':
       return {
         ...state,

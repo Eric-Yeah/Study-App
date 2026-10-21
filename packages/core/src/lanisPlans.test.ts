@@ -103,6 +103,7 @@ describe('Vertretungsplan', () => {
   it('liest Stunden, Bereiche und Datumsformate', () => {
     expect(parsePeriods('3')).toEqual([3]);
     expect(parsePeriods('3 - 5')).toEqual([3, 4, 5]);
+    expect(parsePeriods('1 - 99999999999').length).toBe(21);
     expect(parsePeriods('3, 4')).toEqual([3, 4]);
     expect(parsePeriods(undefined)).toEqual([]);
   });

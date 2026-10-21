@@ -87,6 +87,7 @@ export function RubricPage() {
           rows={4}
           value={teacherText}
           maxLength={CONFIG.exam.maxTeacherTextChars}
+          aria-label="Vorgaben der Lehrkraft"
           placeholder="zum Beispiel: Inhalt 70 %, Darstellung 30 %. Einleitung mit Autor, Titel, Textsorte, Thema. Zitate immer mit Zeilenangabe."
           onChange={(e) => {
             setTeacherText(e.target.value);
@@ -173,6 +174,7 @@ export function RubricPage() {
             style={{ flex: 1 }}
             value={newLesson}
             maxLength={CONFIG.exam.maxLessonChars}
+            aria-label="Eigene Erfahrung"
             placeholder="Eigene Erfahrung, zum Beispiel: Zieht für fehlende Einheiten ab"
             onChange={(e) => setNewLesson(e.target.value)}
           />

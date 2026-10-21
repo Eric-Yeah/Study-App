@@ -12,6 +12,14 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '2026.10.21.4',
+    date: '21. Oktober 2026',
+    items: [
+      { icon: '🎨', title: 'Neues Design: klarer und ruhiger', text: 'Eingabefelder, Knöpfe und Auswahl-Chips haben jetzt deutlichere Rahmen und sind besser zu erkennen. Die Farben sind etwas klarer, die Ecken etwas straffer und die Schatten ruhiger, in Hell und Dunkel.' },
+      { icon: '🔎', title: 'Kleine Schrift besser lesbar', text: 'Die kleinsten Beschriftungen in Plan, Stundenplan und Tags sind jetzt 12 statt 10 oder 11 Pixel groß.' },
+    ],
+  },
+  {
     version: '2026.10.21.3',
     date: '21. Oktober 2026',
     items: [

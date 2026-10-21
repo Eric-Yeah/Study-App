@@ -66,7 +66,7 @@ docs/spec.md      Projektbeschreibung
 - Oberfläche auf Deutsch, Bezeichner im Code auf Englisch. Die deutschen Feldnamen in `docs/spec.md` entsprechen den englischen Typen in `packages/core/src/types.ts` (zum Beispiel Status `weiter`, `ab_q3_abwaehlen`, `abgewaehlt` sind `active`, `drop_q3`, `dropped`; Fachtyp `aufgaben`, `wissen`, `schreiben` sind `problems`, `knowledge`, `writing`).
 - Geschäftslogik nur in `packages/core`, als reine Funktionen mit Tests. Die UI rechnet nichts selbst.
 - Manuelle Werte überschreiben automatische. Zu jedem überschriebenen Wert zeigt die UI den Vorschlag der App.
-- Farben nur über die CSS-Variablen in `apps/web/src/styles/tokens.css`. Jede Änderung in hell und dunkel prüfen.
+- Farben nur über die CSS-Variablen in `apps/web/src/styles/tokens.css` (Design "Klar", seit 21.10.2026: Rahmen von Bedienelementen über `--line-strong` und `--bw`, `--danger-soft`, Radien 20/12/8). Jede Änderung in hell und dunkel prüfen.
 - Geheimnisse (später der API-Schlüssel für die KI-Bewertung) nur in Supabase Edge Functions, nie im Frontend. Im Frontend steht nur der öffentliche anon-Schlüssel, geschützt wird über Row Level Security.
 - Der Zustand liegt in Supabase. Änderungen laufen über den Reducer in `state/store.tsx`, `state/remote.ts` schreibt sie in die Datenbank. Neue Felder brauchen eine neue Migration unter `supabase/migrations/`.
 - Hinweise und Warnungen blockieren nichts, sie empfehlen nur.

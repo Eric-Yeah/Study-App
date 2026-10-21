@@ -349,6 +349,19 @@ export const CONFIG = {
     longBreakMin: 15,
     sessionsUntilLongBreak: 4,
   },
+  daily: {
+    // Alltag: "Als Nächstes" auf Heute, Serie, kurze Kartenrunden
+    minSessionMin: 10, // kürzere Einheiten schlägt die App nicht vor (auch nicht für eine kurze Freistunde)
+    minRemainingMin: 5, // weniger Rest eines Blocks zählt als erledigt
+    freeSlotLookaheadMin: 20, // eine Freistunde, die in so vielen Minuten beginnt, gilt schon als Gelegenheit
+    secondsPerCardEstimate: 30, // Schätzung für "ca. 3 min" bei einer Kartenrunde
+    miniRoundCards: 5, // "5 Karten jetzt"
+    secondsPerCardCap: 45, // Lernzeit einer Kartenrunde: höchstens so viele Sekunden je beantworteter Karte (vergessene Tabs zählen nicht)
+    streakMinMinutes: 10, // ab so vielen Minuten Lernzeit zählt ein Tag für die Serie
+    streakGraceEveryDays: 7, // ein Ausfalltag bricht die Serie nicht, höchstens einer in so vielen Tagen
+    streakLookbackDays: 400,
+    overdueTaskDays: 14, // offene Aufgaben der letzten Tage erscheinen noch auf Heute
+  },
 } as const;
 
 export type Config = typeof CONFIG;

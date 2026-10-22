@@ -3,6 +3,7 @@ import { Check, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ConcentrationCard } from '../components/ConcentrationCard';
+import { AbsencesCard } from '../components/AbsencesCard';
 import { SchoolDay } from '../components/SchoolDay';
 import { formatDateLong, formatDateShort, formatDays, formatMinutes, uid } from '../lib/format';
 import { blocksForDate, combinedPlan, examsWithPlans, learnedMinutesOn, upcoming } from '../state/selectors';
@@ -118,6 +119,8 @@ export function Today() {
       </div>
 
       <SchoolDay />
+
+      <AbsencesCard />
 
       <ConcentrationCard plannedMin={goal} />
 

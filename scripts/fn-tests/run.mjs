@@ -19,6 +19,7 @@ const suites = [
   ['push-send', 'push.mjs'],
   ['delete-account', 'deleteAccount.mjs'],
   ['lanis-calendar', 'lanis.mjs'],
+  ['dsb-plan', 'dsb.mjs'],
   ['fitness-ingest', 'fitness.mjs'],
 ];
 const only = process.argv[2];

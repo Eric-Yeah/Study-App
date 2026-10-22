@@ -2,7 +2,10 @@ import {
   parseSubstitutions,
   parseTimetable,
   planImport,
+  coursesWithAbsences,
+  hasAbsences,
   toIsoDate,
+  type AbsenceReport,
   type ImportItem,
   type SubstitutionEntry,
   type Timetable,
@@ -10,7 +13,7 @@ import {
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { formatDateShort } from '../lib/format';
-import { buildExam, LANIS_ERRORS, lanisErrorCode, type LanisResponse } from '../lib/lanisApply';
+import { buildExam, LANIS_ERRORS, lanisErrorCode, readAbsences, type LanisResponse } from '../lib/lanisApply';
 import { useLanisAuto } from '../lib/lanisAuto';
 import { supabase } from '../lib/supabase';
 import { useStore } from '../state/store';
@@ -47,9 +50,10 @@ export function LanisImport() {
   const [items, setItems] = useState<ImportItem[] | null>(null);
   const [subjectFor, setSubjectFor] = useState<Record<string, string>>({});
   const [selected, setSelected] = useState<Record<string, boolean>>({});
-  const [plans, setPlans] = useState<{ timetable: Timetable | null; subs: SubstitutionEntry[] | null; errors: Record<string, string> } | null>(null);
+  const [plans, setPlans] = useState<{ timetable: Timetable | null; subs: SubstitutionEntry[] | null; absences: AbsenceReport | null; errors: Record<string, string> } | null>(null);
   const [takeTimetable, setTakeTimetable] = useState(true);
-  const [takeSubs, setTakeSubs] = useState(true);
+  const [takeSubs, setTakeSubs] = useState(!auto.dsbEnabled); // mit DSBmobile kommen die Vertretungen von dort
+  const [takeAbsences, setTakeAbsences] = useState(true);
 
   const fetchExams = async (e: FormEvent) => {
     e.preventDefault();
@@ -73,7 +77,8 @@ export function LanisImport() {
     const list = planImport(data.events ?? [], state.subjects, state.exams, toIsoDate(new Date()));
     const timetable = data.timetableHtml ? parseTimetable(data.timetableHtml) : null;
     const subs = data.substitutions ? data.substitutions.flatMap((d) => parseSubstitutions(d.date, d.raw)) : null;
-    setPlans({ timetable: timetable && timetable.lessons.length > 0 ? timetable : null, subs, errors: data.errors ?? {} });
+    const absences = readAbsences(data.absencesHtml);
+    setPlans({ timetable: timetable && timetable.lessons.length > 0 ? timetable : null, subs, absences: absences && hasAbsences(absences) ? absences : null, errors: data.errors ?? {} });
     setItems(list);
     setSubjectFor(Object.fromEntries(list.map((i) => [i.lanis.externalId, i.subjectId ?? ''])));
     setSelected(Object.fromEntries(list.map((i) => [i.lanis.externalId, i.status !== 'known' && i.subjectId !== null])));
@@ -83,11 +88,13 @@ export function LanisImport() {
 
   const wantTimetable = Boolean(plans?.timetable && takeTimetable);
   const wantSubs = Boolean(plans?.subs && takeSubs);
+  const wantAbsences = Boolean(plans?.absences && takeAbsences);
 
   const doImport = () => {
     const now = new Date().toISOString();
     if (wantTimetable && plans?.timetable) dispatch({ type: 'setTimetable', timetable: plans.timetable, at: now });
     if (wantSubs && plans?.subs) dispatch({ type: 'setSubstitutions', substitutions: plans.subs, at: now });
+    if (wantAbsences && plans?.absences) dispatch({ type: 'setAbsences', absences: plans.absences, at: now });
     for (const item of chosen) {
       dispatch({ type: 'upsertExam', exam: buildExam(item, subjectFor[item.lanis.externalId], state.subjects) });
     }
@@ -196,6 +203,17 @@ export function LanisImport() {
           ) : (
             <p className="hint">{plans.errors.substitutions ? 'Der Vertretungsplan konnte nicht gelesen werden.' : 'Kein Vertretungsplan gefunden.'}</p>
           )}
+          {plans.absences && (
+            <label className="task" style={{ cursor: 'pointer' }}>
+              <input type="checkbox" checked={takeAbsences} onChange={(e) => setTakeAbsences(e.target.checked)} />
+              <div style={{ flex: 1 }}>
+                <strong>Fehlstunden übernehmen</strong>
+                <div className="hint">
+                  Eingetragene Fehlzeiten in {plural(coursesWithAbsences(plans.absences).length, 'Kurs', 'Kursen')}. Die Zahlen führt die Schule, die App zeigt sie nur an.
+                </div>
+              </div>
+            </label>
+          )}
         </div>
       )}
 
@@ -247,11 +265,12 @@ export function LanisImport() {
       )}
 
       {(items || plans) && (
-        <button type="button" className="btn btn-primary" disabled={chosen.length === 0 && !wantTimetable && !wantSubs} onClick={doImport}>
+        <button type="button" className="btn btn-primary" disabled={chosen.length === 0 && !wantTimetable && !wantSubs && !wantAbsences} onClick={doImport}>
           Übernehmen
           {chosen.length > 0 ? `: ${plural(chosen.length, 'Klausur', 'Klausuren')}` : ''}
           {wantTimetable ? `${chosen.length > 0 ? ', ' : ': '}Stundenplan` : ''}
           {wantSubs ? `${chosen.length > 0 || wantTimetable ? ', ' : ': '}Vertretungen` : ''}
+          {wantAbsences ? `${chosen.length > 0 || wantTimetable || wantSubs ? ', ' : ': '}Fehlstunden` : ''}
         </button>
       )}
     </div>

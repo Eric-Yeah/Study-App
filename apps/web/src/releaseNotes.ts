@@ -12,6 +12,14 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '2026.10.22.2',
+    date: '22. Oktober 2026',
+    items: [
+      { icon: '🩺', title: 'Fehlstunden aus Lanis', text: 'Die App liest jetzt auch deine eingetragenen Fehlstunden aus Lanis („Mein Unterricht“, Anwesenheit). Sobald irgendwo eine Fehlzeit steht, erscheint auf Heute die Karte „Fehlstunden“ mit der Summe und den Kursen, in denen du gefehlt hast. Sind Stunden noch unentschuldigt, weist die App darauf hin. Die Zahlen führt die Schule, die App zeigt sie nur an. Sie werden mit dem Stundenplan aktualisiert (etwa alle 12 Stunden).' },
+      { icon: '📋', title: 'Vertretungsplan aus DSBmobile', text: 'Steht der Vertretungsplan deiner Schule in der App „DSBmobile“ statt in Lanis? Unter Einstellungen → Vertretungsplan (DSBmobile) gibst du die Zugangsdaten der Schule ein. Die App holt dann den Plan der ganzen Schule und zeigt dir auf Heute nur, was deine Stufe und deine Stunden betrifft. Das Passwort bleibt verschlüsselt nur auf deinem Gerät. Du brauchst dafür deinen Stundenplan aus Lanis.' },
+    ],
+  },
+  {
     version: '2026.10.22.1',
     date: '22. Oktober 2026',
     items: [

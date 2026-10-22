@@ -3,11 +3,12 @@
 // - Läuft nur für angemeldete, freigegebene Konten (Verify JWT an und zusätzlich getUser, accounts.status = active), höchstens
 //   20 Abrufe je Konto in 10 Minuten (rate_hit), damit die Function nicht zum Durchprobieren von Schulportal-Passwörtern taugt.
 // - Das Schulportal-Passwort wird nur für diese Anfrage verwendet: nicht gespeichert, nicht geloggt.
-// - Anfrage: { schoolId, username, password, parts?: ['calendar', 'timetable', 'substitutions'] }
-// - Antwort: { events, timetableHtml, substitutions, errors }
+// - Anfrage: { schoolId, username, password, parts?: ['calendar', 'timetable', 'substitutions', 'absences'] }
+// - Antwort: { events, timetableHtml, substitutions, absencesHtml, errors }
 //   events: nur Klausur-Einträge mit Id, title, description, start, allDay
 //   timetableHtml: nur der Abschnitt "Persönlicher Stundenplan" (nicht der Gesamtplan der Stufe)
 //   substitutions: pro Tag die Rohliste von "Mein Vertretungsplan" ([{ date: 'dd.mm.yyyy', raw }])
+//   absencesHtml: nur die Anwesenheitstabelle (id="anwesend") von "Mein Unterricht" mit den Fehlstunden je Kurs
 //   errors: pro Teil ein Fehlercode, wenn nur dieser Teil nicht gelesen werden konnte
 // Ablauf der Anmeldung nach SPHclient (MIT), mit sauber kodiertem Passwort.
 
@@ -133,6 +134,18 @@ async function getSubstitutions(schoolId: string, sid: string): Promise<{ date: 
   return out;
 }
 
+/** Fehlstunden: die Tabelle id="anwesend" auf "Mein Unterricht". Gibt nur dieses Stück Seite zurück (höchstens 200 KB). */
+async function getAbsencesHtml(schoolId: string, sid: string): Promise<string | null> {
+  const res = await fetch(`${BASE}/meinunterricht.php?cacheBreaker=${Date.now()}`, { headers: { 'user-agent': UA, cookie: sessionCookie(schoolId, sid) } });
+  const html = await res.text();
+  const at = html.search(/id=["']anwesend["']/i);
+  if (at < 0) return null;
+  const start = html.lastIndexOf('<', at);
+  const tableEnd = html.indexOf('</table>', at);
+  if (start < 0 || tableEnd < 0) return null;
+  return html.slice(start, tableEnd + '</table>'.length).slice(0, 200_000);
+}
+
 async function logout(cookies: string) {
   await fetch('https://start.schulportal.hessen.de/index.php?logout=all', {
     headers: { cookie: cookies, 'user-agent': UA },
@@ -168,7 +181,7 @@ Deno.serve(async (req) => {
   const username = String(input.username ?? '').trim();
   const password = String(input.password ?? '');
   const days = Math.min(400, Math.max(1, Number(input.days) || 200));
-  const ALL = ['calendar', 'timetable', 'substitutions'];
+  const ALL = ['calendar', 'timetable', 'substitutions', 'absences'];
   const parts = Array.isArray(input.parts) ? ALL.filter((p) => (input.parts as unknown[]).includes(p)) : ALL;
   // schoolId und username landen in URL und Formular: nur erwartete Zeichen zulassen.
   if (!/^\d{1,6}$/.test(schoolId) || !/^[\p{L}\p{N}._-]{1,64}$/u.test(username) || !password || password.length > 200) {
@@ -183,6 +196,7 @@ Deno.serve(async (req) => {
       events?: unknown[];
       timetableHtml?: string | null;
       substitutions?: { date: string; raw: unknown }[];
+      absencesHtml?: string | null;
       errors: Record<string, string>;
     } = { errors: {} };
     if (parts.includes('calendar')) {
@@ -210,6 +224,14 @@ Deno.serve(async (req) => {
         result.substitutions = await getSubstitutions(schoolId, session.sid);
       } catch {
         result.errors.substitutions = 'lanis_unavailable';
+      }
+    }
+    if (parts.includes('absences')) {
+      try {
+        result.absencesHtml = await getAbsencesHtml(schoolId, session.sid);
+        if (result.absencesHtml === null) result.errors.absences = 'not_found';
+      } catch {
+        result.errors.absences = 'lanis_unavailable';
       }
     }
     // Nur wenn gar nichts gelesen werden konnte, ist die Anfrage insgesamt fehlgeschlagen.

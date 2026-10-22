@@ -1,4 +1,4 @@
-import { AI_FEATURES, CONFIG, readAccess, type AccountAccess, readAbiturPlan, emptyPlan, sanitizeStyle, type StyleRecord, isLanguage, isQuarter, isLevel, readLessons, readPracticeContent, readPracticeMeta, readStoredGrading, readTeacherTasks, type ExamReview, type PracticeRecord, type SubjectRubric, toDifficulty, type Flashcard, type Effort, type Exam, Legibility, PlanSettings, Role, Stage, Subject, SubjectStatus, SubjectType, SubstitutionEntry, Timetable, WorksheetSummary } from '@study/core';
+import { AI_FEATURES, CONFIG, type AbsenceReport, readAccess, type AccountAccess, readAbiturPlan, emptyPlan, sanitizeStyle, type StyleRecord, isLanguage, isQuarter, isLevel, readLessons, readPracticeContent, readPracticeMeta, readStoredGrading, readTeacherTasks, type ExamReview, type PracticeRecord, type SubjectRubric, toDifficulty, type Flashcard, type Effort, type Exam, Legibility, PlanSettings, Role, Stage, Subject, SubjectStatus, SubjectType, SubstitutionEntry, Timetable, WorksheetSummary } from '@study/core';
 import { supabase } from '../lib/supabase';
 import type { Action, AppState, Checkin, DayOverride, FitnessDay, FocusSession, LessonNote, Task, Topic } from './store';
 
@@ -9,7 +9,7 @@ import type { Action, AppState, Checkin, DayOverride, FitnessDay, FocusSession, 
 
 export type RemoteData = Pick<
   AppState,
-  'onboarded' | 'profile' | 'subjects' | 'exams' | 'plan' | 'timer' | 'sessions' | 'tasks' | 'checkins' | 'fitness' | 'dayOverrides' | 'topics' | 'timetable' | 'timetableAt' | 'substitutions' | 'substitutionsAt' | 'notes' | 'cards' | 'examReviews' | 'rubrics' | 'practiceExams' | 'abiturPlan' | 'taskStyles' | 'account'
+  'onboarded' | 'profile' | 'subjects' | 'exams' | 'plan' | 'timer' | 'sessions' | 'tasks' | 'checkins' | 'fitness' | 'dayOverrides' | 'topics' | 'timetable' | 'timetableAt' | 'substitutions' | 'substitutionsAt' | 'absences' | 'absencesAt' | 'notes' | 'cards' | 'examReviews' | 'rubrics' | 'practiceExams' | 'abiturPlan' | 'taskStyles' | 'account'
 >;
 
 function ok<T extends { error: { message: string } | null }>(res: T): T {
@@ -358,6 +358,8 @@ export async function loadRemote(
     timetableAt: null,
     substitutions: [],
     substitutionsAt: null,
+    absences: null,
+    absencesAt: null,
     notes: [],
     cards: [],
     examReviews: [],
@@ -384,6 +386,9 @@ export async function loadRemote(
   data.timetableAt = tt?.fetched_at ?? null;
   data.substitutions = sb ? (sb.data as SubstitutionEntry[]) : [];
   data.substitutionsAt = sb?.fetched_at ?? null;
+  const ab = snap('absences');
+  data.absences = ab ? (ab.data as AbsenceReport) : null;
+  data.absencesAt = ab?.fetched_at ?? null;
   data.notes = (ln.error ? [] : ln.data ?? []).map((r) => ({
     id: r.id,
     subjectId: r.subject_id,
@@ -483,6 +488,8 @@ export function pickRemote(s: AppState): RemoteData {
     timetableAt: s.timetableAt,
     substitutions: s.substitutions,
     substitutionsAt: s.substitutionsAt,
+    absences: s.absences,
+    absencesAt: s.absencesAt,
     notes: s.notes,
     cards: s.cards,
     examReviews: s.examReviews,
@@ -529,6 +536,8 @@ export async function persist(action: Action, next: AppState, userId: string): P
       return upsert('lanis_snapshots', { user_id: userId, kind: 'timetable', data: action.timetable, fetched_at: action.at }, 'user_id,kind');
     case 'setSubstitutions':
       return upsert('lanis_snapshots', { user_id: userId, kind: 'substitutions', data: action.substitutions, fetched_at: action.at }, 'user_id,kind');
+    case 'setAbsences':
+      return upsert('lanis_snapshots', { user_id: userId, kind: 'absences', data: action.absences, fetched_at: action.at }, 'user_id,kind');
     case 'upsertNote':
       return upsert('lesson_notes', noteRow(userId, action.note));
     case 'deleteNote':

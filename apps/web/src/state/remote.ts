@@ -1,4 +1,4 @@
-import { AI_FEATURES, type AbsenceReport, clampPoints, clampWeight, defaultWeight, isGradeKind, readGradeSettings, type GradeEntry, CONFIG, readAccess, type AccountAccess, readAbiturPlan, emptyPlan, sanitizeStyle, type StyleRecord, isLanguage, isQuarter, isLevel, readLessons, readPracticeContent, readPracticeMeta, readStoredGrading, readTeacherTasks, type ExamReview, type PracticeRecord, type SubjectRubric, toDifficulty, type Flashcard, type Effort, type Exam, Legibility, PlanSettings, Role, Stage, Subject, SubjectStatus, SubjectType, SubstitutionEntry, Timetable, WorksheetSummary } from '@study/core';
+import { AI_FEATURES, readHomework, type AbsenceReport, clampPoints, clampWeight, defaultWeight, isGradeKind, readGradeSettings, type GradeEntry, CONFIG, readAccess, type AccountAccess, readAbiturPlan, emptyPlan, sanitizeStyle, type StyleRecord, isLanguage, isQuarter, isLevel, readLessons, readPracticeContent, readPracticeMeta, readStoredGrading, readTeacherTasks, type ExamReview, type PracticeRecord, type SubjectRubric, toDifficulty, type Flashcard, type Effort, type Exam, Legibility, PlanSettings, Role, Stage, Subject, SubjectStatus, SubjectType, SubstitutionEntry, Timetable, WorksheetSummary } from '@study/core';
 import { supabase } from '../lib/supabase';
 import type { Action, AppState, Checkin, DayOverride, FitnessDay, FocusSession, LessonNote, Task, Topic } from './store';
 
@@ -9,7 +9,7 @@ import type { Action, AppState, Checkin, DayOverride, FitnessDay, FocusSession, 
 
 export type RemoteData = Pick<
   AppState,
-  'onboarded' | 'profile' | 'subjects' | 'exams' | 'plan' | 'timer' | 'sessions' | 'tasks' | 'checkins' | 'fitness' | 'dayOverrides' | 'topics' | 'timetable' | 'timetableAt' | 'substitutions' | 'substitutionsAt' | 'absences' | 'absencesAt' | 'notes' | 'cards' | 'examReviews' | 'rubrics' | 'practiceExams' | 'abiturPlan' | 'grades' | 'gradeSettings' | 'taskStyles' | 'account'
+  'onboarded' | 'profile' | 'subjects' | 'exams' | 'plan' | 'timer' | 'sessions' | 'tasks' | 'checkins' | 'fitness' | 'dayOverrides' | 'topics' | 'timetable' | 'timetableAt' | 'substitutions' | 'substitutionsAt' | 'absences' | 'absencesAt' | 'homework' | 'homeworkAt' | 'notes' | 'cards' | 'examReviews' | 'rubrics' | 'practiceExams' | 'abiturPlan' | 'grades' | 'gradeSettings' | 'taskStyles' | 'account'
 >;
 
 function ok<T extends { error: { message: string } | null }>(res: T): T {
@@ -51,6 +51,7 @@ const taskRow = (userId: string, t: Task) => ({
   minutes: t.minutes,
   date: t.date,
   done: t.done,
+  external_id: t.externalId ?? null,
 });
 
 const sessionRow = (userId: string, s: FocusSession) => ({
@@ -114,6 +115,7 @@ const noteRow = (userId: string, n: LessonNote) => ({
   legibility: n.legibility,
   effort: n.effort,
   file_hashes: n.fileHashes,
+  lanis_keys: n.lanisKeys,
   teacher: n.teacher,
   quarter: n.quarter,
   pdf_path: n.pdfPath,
@@ -357,6 +359,7 @@ export async function loadRemote(
       minutes: r.minutes,
       date: r.date,
       done: r.done,
+      externalId: typeof r.external_id === 'string' ? r.external_id : null,
     })),
     checkins: (ci.error ? [] : ci.data ?? []).map((r) => ({
       date: r.date,
@@ -375,6 +378,8 @@ export async function loadRemote(
     substitutionsAt: null,
     absences: null,
     absencesAt: null,
+    homework: null,
+    homeworkAt: null,
     notes: [],
     cards: [],
     examReviews: [],
@@ -422,6 +427,9 @@ export async function loadRemote(
   const ab = snap('absences');
   data.absences = ab ? (ab.data as AbsenceReport) : null;
   data.absencesAt = ab?.fetched_at ?? null;
+  const hw = snap('homework');
+  data.homework = hw ? readHomework(hw.data) : null;
+  data.homeworkAt = hw?.fetched_at ?? null;
   data.notes = (ln.error ? [] : ln.data ?? []).map((r) => ({
     id: r.id,
     subjectId: r.subject_id,
@@ -434,6 +442,7 @@ export async function loadRemote(
     quarter: isQuarter(r.quarter) ? r.quarter : null,
     pdfPath: typeof r.pdf_path === 'string' ? r.pdf_path : null,
     fileHashes: Array.isArray(r.file_hashes) ? (r.file_hashes as string[]) : [],
+    lanisKeys: Array.isArray(r.lanis_keys) ? (r.lanis_keys as string[]) : [],
     createdAt: r.created_at ?? '',
   }));
   // Fehlt die Migration für die Karten noch, startet die App trotzdem (ohne Karten).
@@ -523,6 +532,8 @@ export function pickRemote(s: AppState): RemoteData {
     substitutionsAt: s.substitutionsAt,
     absences: s.absences,
     absencesAt: s.absencesAt,
+    homework: s.homework,
+    homeworkAt: s.homeworkAt,
     notes: s.notes,
     cards: s.cards,
     examReviews: s.examReviews,
@@ -573,6 +584,8 @@ export async function persist(action: Action, next: AppState, userId: string): P
       return upsert('lanis_snapshots', { user_id: userId, kind: 'substitutions', data: action.substitutions, fetched_at: action.at }, 'user_id,kind');
     case 'setAbsences':
       return upsert('lanis_snapshots', { user_id: userId, kind: 'absences', data: action.absences, fetched_at: action.at }, 'user_id,kind');
+    case 'setHomework':
+      return upsert('lanis_snapshots', { user_id: userId, kind: 'homework', data: action.homework, fetched_at: action.at }, 'user_id,kind');
     case 'upsertNote':
       return upsert('lesson_notes', noteRow(userId, action.note));
     case 'deleteNote':

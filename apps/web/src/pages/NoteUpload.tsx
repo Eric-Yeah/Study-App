@@ -28,6 +28,7 @@ import { dropImagesIfSure, removeDocument, removeNoteImages, summarizeWorksheet,
 import { preparePages, type Progress } from '../lib/worksheetFiles';
 import { useStore, type LessonNote } from '../state/store';
 import { useAccess } from '../lib/access';
+import { clearPendingUpload, peekPendingUpload } from '../lib/lanisFiles';
 
 export const EMPTY_SUMMARY: WorksheetSummary = { thema: '', kernaussagen: [], begriffe: [], formeln: [], offene_fragen: [], lesbarkeit: 'sicher' };
 
@@ -76,11 +77,15 @@ export function NoteUpload({ onCreated, onSettled }: { onCreated: (c: Created) =
     return (lesson && matchSubject(lesson.abbr, state.subjects)) || '';
   }, [state.timetable, state.subjects, today]);
 
-  const [subjectId, setSubjectId] = useState(guess);
-  const [date, setDate] = useState(today);
-  const [teacher, setTeacher] = useState('');
+  // Anhänge aus Lanis (Seite Hausaufgaben): Dateien, Fach, Datum und Lehrkraft sind schon gewählt, der Rest läuft wie gewohnt
+  const [fromLanis] = useState(peekPendingUpload);
+  useEffect(() => clearPendingUpload(), []);
+
+  const [subjectId, setSubjectId] = useState(fromLanis?.subjectId ?? guess);
+  const [date, setDate] = useState(fromLanis?.date ?? today);
+  const [teacher, setTeacher] = useState(fromLanis?.teacher ?? '');
   const [quarter, setQuarter] = useState<Quarter | ''>('');
-  const [files, setFiles] = useState<File[]>([]);
+  const [files, setFiles] = useState<File[]>(fromLanis?.files ?? []);
   const access = useAccess();
   const [useAi, setUseAi] = useState(access.can('summarize'));
   const [built, setBuilt] = useState<(MergedPdf & { url: string }) | null>(null);
@@ -92,7 +97,7 @@ export function NoteUpload({ onCreated, onSettled }: { onCreated: (c: Created) =
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<Progress | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [touched, setTouched] = useState({ teacher: false, quarter: false });
+  const [touched, setTouched] = useState({ teacher: Boolean(fromLanis?.teacher), quarter: false });
   const [dragging, setDragging] = useState(false);
   const [previews, setPreviews] = useState<(string | null)[]>([]);
   const cameraRef = useRef<HTMLInputElement>(null);
@@ -206,6 +211,14 @@ export function NoteUpload({ onCreated, onSettled }: { onCreated: (c: Created) =
     }
   };
 
+  // Aus Lanis geladene Dateien gleich zusammenfügen: der Nutzer landet direkt beim Prüfen der Seiten
+  const autoBuilt = useRef(false);
+  useEffect(() => {
+    if (!fromLanis || autoBuilt.current || files.length === 0) return;
+    autoBuilt.current = true;
+    void build();
+  }); // eslint-disable-line react-hooks/exhaustive-deps
+
   const upload = async () => {
     if (!built || !finalPdf || !quarter) return;
     setBusy(true);
@@ -238,6 +251,7 @@ export function NoteUpload({ onCreated, onSettled }: { onCreated: (c: Created) =
         quarter: quarter || null,
         pdfPath: null,
         fileHashes: prepared?.fileHashes ?? [],
+        lanisKeys: files.map((f) => fromLanis?.keys[f.name]).filter((k): k is string => Boolean(k)),
         createdAt: new Date().toISOString(),
       };
       dispatch({ type: 'upsertNote', note });

@@ -13,6 +13,7 @@ export type TabId =
   | 'lanis'
   | 'notizen'
   | 'karten'
+  | 'hausaufgaben'
   | 'termine'
   | 'korrekturen'
   | 'uebung'
@@ -61,6 +62,7 @@ export const AREAS: NavArea[] = [
     tabs: [
       { id: 'notizen', to: '/notizen', label: 'Notizen' },
       { id: 'karten', to: '/karten', label: 'Karteikarten' },
+      { id: 'hausaufgaben', to: '/hausaufgaben', label: 'Hausaufgaben' },
     ],
   },
   {
@@ -102,6 +104,7 @@ const RULES: { test: RegExp; area: AreaId; tab: TabId | null }[] = [
   { test: /^\/import(\/|$)/, area: 'plan', tab: 'lanis' },
   { test: /^\/notizen(\/|$)/, area: 'notizen', tab: 'notizen' },
   { test: /^\/karten(\/|$)/, area: 'notizen', tab: 'karten' },
+  { test: /^\/hausaufgaben(\/|$)/, area: 'notizen', tab: 'hausaufgaben' },
   { test: /^\/klausuren(\/|$)/, area: 'klausuren', tab: 'termine' },
   { test: /^\/klausur(\/|$)/, area: 'klausuren', tab: 'termine' },
   { test: /^\/korrektur\/(uebung|stil)(\/|$)/, area: 'klausuren', tab: 'uebung' },

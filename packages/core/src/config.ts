@@ -348,6 +348,19 @@ export const CONFIG = {
     // Nach einem Abruf, dessen Plan nicht übernommen wurde (kaputt oder unvollständig), frühestens nach so vielen Minuten erneut
     retryGapMin: 10,
   },
+  homework: {
+    // Hausaufgaben und Anhänge aus den Kursmappen in Lanis ("Mein Unterricht"): so lange bleiben Einträge in der App
+    keepDays: 60,
+    // Nur Hausaufgaben aus Einträgen der letzten Tage werden zu Aufgaben (beim ersten Abruf soll nicht das ganze Halbjahr auftauchen)
+    taskDays: 7,
+    // Länge des Aufgabentitels aus dem Hausaufgabentext
+    titleMax: 90,
+    // Obergrenzen für den Abruf (die Function hält dieselben Zahlen ein): Kursmappen je Abruf, Dateien je Download
+    maxCourses: 20,
+    maxDownloads: 12,
+    // Hausaufgabenabruf höchstens alle so viele Stunden (bei Start und Rückkehr in die App)
+    maxAgeHours: 2,
+  },
   school: {
     // Eine Freistunde zwischen diesen beiden Stunden (ausschließlich) ist Mittagspause zum Essen, nicht zum Lernen.
     lunchAfterPeriod: 6,

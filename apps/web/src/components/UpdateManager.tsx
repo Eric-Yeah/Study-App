@@ -5,7 +5,7 @@ import { APP_VERSION } from '../releaseNotes';
 
 const TRY_KEY = 'study-app-update-try'; // Schleifenschutz: dieselbe Version nicht öfter als alle 10 Minuten automatisch laden
 const MIN_CHECK_MS = 2 * 60_000;
-const SKIP_ROUTES = /^\/(klausur|korrektur|import|start)/; // dort liegen Entwürfe, Uploads oder Passwörter, nicht mitten drin neu laden
+const SKIP_ROUTES = /^\/(klausur\/|korrektur|import|start)/; // dort liegen Entwürfe, Uploads oder Passwörter, nicht mitten drin neu laden
 
 function recentlyTried(version: string): boolean {
   try {
@@ -64,7 +64,9 @@ export function UpdateManager() {
     const id = window.setInterval(() => {
       const el = document.activeElement;
       const typing = el instanceof HTMLElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName);
-      if (!typing && !SKIP_ROUTES.test(pathname)) reloadInto(available);
+      // data-no-reload: Seiten mit Entwurf im Speicher (Blatt hochladen, Lernrunde der Karten) lädt die App nicht von selbst neu
+      const guarded = document.querySelector('[data-no-reload]') !== null;
+      if (!typing && !guarded && !SKIP_ROUTES.test(pathname)) reloadInto(available);
     }, 1500);
     return () => window.clearInterval(id);
   }, [available, pathname]);

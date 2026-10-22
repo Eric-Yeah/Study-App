@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useStore } from '../../state/store';
 import { DifficultyTag } from '../DifficultyPicker';
 import { StudyDone, StudyHead } from './StudyDone';
+import { useRoundTime } from './useRoundTime';
 
 /**
  * Schreiben: die Antwort eintippen, die App prüft ohne Groß- und Kleinschreibung und verzeiht kleine Tippfehler.
@@ -10,6 +11,7 @@ import { StudyDone, StudyHead } from './StudyDone';
  */
 export function StudyWrite({ cards, subjects, onClose }: { cards: Flashcard[]; subjects: Subject[]; onClose: () => void }) {
   const { dispatch } = useStore();
+  const noteAnswer = useRoundTime(cards);
   const today = toIsoDate(new Date());
   const [round, setRound] = useState(cards.filter(isTypable));
   const [index, setIndex] = useState(0);
@@ -28,6 +30,7 @@ export function StudyWrite({ cards, subjects, onClose }: { cards: Flashcard[]; s
   const finish = (correct: boolean) => {
     if (!card) return;
     dispatch({ type: 'upsertCard', card: reviewCard(card, gradeFor('write', correct), today) });
+    noteAnswer();
     if (correct) setRightCount((n) => n + 1);
     else setMissed((m) => [...m, card]);
     setFeedback(null);

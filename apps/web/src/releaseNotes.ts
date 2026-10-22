@@ -29,6 +29,59 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     ],
   },
   {
+    version: '2026.10.21.5',
+    date: '21. Oktober 2026',
+    items: [
+      { icon: '▶️', title: 'Heute sagt dir, was jetzt dran ist', text: 'Ganz oben auf Heute steht „Als Nächstes“: das Fach aus deinem Tagesplan, in einer Freistunde passend gekürzt. Ein Tipp startet den Timer, ohne Fach und Länge auszuwählen. Ist der Plan geschafft, kommen offene Aufgaben, dann fällige Karten. Jeder geplante Block lässt sich ebenfalls direkt starten.' },
+      { icon: '➕', title: 'Schnell hinzufügen', text: 'Der runde Plus-Knopf (am Mac auch die Taste N) legt in Sekunden eine Aufgabe, eine Karteikarte oder nachgetragene Lernzeit an. Das Fach ist aus deinem Stundenplan vorgewählt, das Fenster bleibt offen für die nächste Karte. Von dort geht es auch direkt zum Blatt-Hochladen.' },
+      { icon: '🃏', title: 'Karten in Häppchen', text: 'Heute zeigt, wie viele Karten fällig sind, und „5 Karten jetzt“ startet eine kurze Runde, danach geht es mit „Noch …“ weiter oder zurück. Kartenrunden zählen jetzt als Lernzeit für Tagesziel, Plan und Serie.' },
+      { icon: '🔥', title: 'Serie ohne Druck', text: 'Die Woche als Punkte und die Zahl der Lerntage in Folge stehen bei der Lernzeit. Ein freier Tag bricht die Serie nicht, lernfreie Wochentage und Ausfalltage zählen gar nicht. Ab 10 Minuten zählt ein Tag.' },
+      { icon: '⏱️', title: 'Timer immer im Blick', text: 'Läuft der Timer, zeigt eine Leiste oben auf jeder Seite Fach und Restzeit, im Browser-Tab steht die Zeit im Titel. Auf der Fokus-Seite ist das Fach vorgewählt, und die Länge der Runde (15, 25, 45, 60 Minuten) stellst du mit einem Tipp ein.' },
+      { icon: '🔔', title: 'Erinnerungen leichter einschalten', text: 'Auf Heute fragt ein Hinweis einmal, ob du den Tagesplan morgens aufs Handy willst, mit einem Tipp eingeschaltet. Die Morgenmitteilung nennt jetzt auch die fälligen Karten und kommt an Tagen ohne Lernblock, wenn Karten warten.' },
+      { icon: '🧹', title: 'Kürzere Heute-Seite', text: 'Der Check-in zeigt nur noch die Energie (ein Tipp), Schlaf und Training klappst du bei Bedarf auf. Offene Aufgaben von früher bleiben auf Heute sichtbar, statt unbemerkt zu verschwinden.' },
+    ],
+  },
+  {
+    version: '2026.10.21.4',
+    date: '21. Oktober 2026',
+    items: [
+      { icon: '🎨', title: 'Neues Design: klarer und ruhiger', text: 'Eingabefelder, Knöpfe und Auswahl-Chips haben jetzt deutlichere Rahmen und sind besser zu erkennen. Die Farben sind etwas klarer, die Ecken etwas straffer und die Schatten ruhiger, in Hell und Dunkel.' },
+      { icon: '🔎', title: 'Kleine Schrift besser lesbar', text: 'Die kleinsten Beschriftungen in Plan, Stundenplan und Tags sind jetzt 12 statt 10 oder 11 Pixel groß.' },
+    ],
+  },
+  {
+    version: '2026.10.21.3',
+    date: '21. Oktober 2026',
+    items: [
+      { icon: '🧭', title: 'Neu sortiert: alles auf einen Blick', text: 'Die untere Leiste hat jetzt sechs Bereiche: Heute, Fokus, Plan, Notizen, Klausuren und Noten. Die Einstellungen findest du am Handy oben rechts als Zahnrad, am Tablet und Mac unten in der Seitenleiste.' },
+      { icon: '🗂️', title: 'Reiter in jedem Bereich', text: 'Plan, Rückblick und Lanis sind Reiter im Bereich Plan. Notizen und Karteikarten gehören zusammen, ebenso Noten, Abiturrechner und Fächer. Der Bereich in der Leiste bleibt aktiv, auch wenn du eine Unterseite wie eine Korrektur offen hast.' },
+      { icon: '📋', title: 'Klausuren als eigener Bereich', text: 'Termine mit Lernfortschritt, Korrekturen mit den Korrekturmustern, Übungsklausuren mit dem Aufgabenstil und die Schwächen-Auswertung haben jetzt einen eigenen Platz. Im Plan führt eine Karte zu den Klausuren. Alte Links funktionieren weiter.' },
+    ],
+  },
+  {
+    version: '2026.10.21.2',
+    date: '21. Oktober 2026',
+    items: [
+      { icon: '📝', title: 'Noten: mehr als die Halbjahresnote', text: 'Unter Fächer → Noten trägst du jetzt jede einzelne Note ein: Klausuren, mündliche Mitarbeit, Tests, Referate, Hausaufgaben und Projekte, mit Datum, Punkten und Gewicht. Daraus berechnet die App deine Kursnote je Halbjahr (Q1 bis Q4).' },
+      { icon: '⚖️', title: 'Klausuren und Mündliches gewichten', text: 'Wie Klausuren und sonstige Leistungen zählen, entscheidet deine Lehrkraft. Stell das Verhältnis pro Fach ein (Standard 50 : 50). Gibt es nur eine Gruppe, zählt allein sie.' },
+      { icon: '🎯', title: 'Was brauche ich?', text: 'Wähle eine Zielnote für den Kurs, die App sagt dir, wie viele Punkte du in der nächsten Klausur oder mündlichen Leistung mindestens brauchst. Dazu Trend, Schnitt und ein Hinweis bei Kursen unter 5 Punkten.' },
+      { icon: '🎓', title: 'Weiter in den Abiturrechner', text: 'Ein Tipp übernimmt deine Kursnoten in den Abiturrechner. Vergangene Klausuren aus dem Plan ohne Note erinnern dich ans Eintragen, Noten deiner Lehrkraft aus der Klausurenkorrektur übernimmst du mit einem Tipp, und den Notenstand eines Fachs kannst du aus den Einzelnoten übernehmen.' },
+    ],
+  },
+  {
+    version: '2026.10.21.1',
+    date: '21. Oktober 2026',
+    items: [
+      { icon: '📄', title: 'Gescannte PDFs auch in älteren Browsern', text: 'Gescannte PDFs lassen sich auch in älteren Browsern hochladen und zusammenfassen. Fotos werden ebenfalls auf älteren Geräten richtig gedreht und verkleinert.' },
+      { icon: '⏱️', title: 'Fokus-Zeit geht nicht mehr verloren', text: 'Läuft der Timer auf einem Gerät im Hintergrund weiter, wird die gelernte Zeit jetzt trotzdem gespeichert, auch wenn ein anderes Gerät das Ende der Phase bemerkt.' },
+      { icon: '🔢', title: 'Karten: Zahlen genau prüfen', text: 'Beim Schreiben gilt 1,5 nicht mehr als 15, und eine falsche Ziffer (13,5 statt 12,5) zählt nicht mehr als Tippfehler. Punkt und Komma gelten gleich.' },
+      { icon: '👆', title: 'Besser auf dem Handy', text: 'Die Leiste unten schneidet „Einstellungen“ nicht mehr ab, die Schritte beim Blatt-Hochladen laufen nicht mehr über den Rand, und kleine Knöpfe (Aufgaben abhaken, Plan anpassen, Wochen aufklappen) sind leichter zu treffen. Deaktivierte Knöpfe sehen jetzt auch deaktiviert aus. Auf dem iPad schob ein aufgeklapptes Fach die Seite „Fächer“ seitlich auseinander, das ist behoben.' },
+      { icon: '🔑', title: 'Anmelden', text: 'Beim Anmelden verlangt das Passwortfeld keine Mindestlänge mehr, nur noch beim Erstellen eines Kontos.' },
+      { icon: '🔍', title: 'Besser lesbar', text: 'Graue Hinweistexte haben im hellen und dunklen Design mehr Kontrast.' },
+      { icon: '🛟', title: 'Weniger Datenverlust', text: 'Der Abiturrechner speichert die letzte Eingabe auch, wenn du die Seite sofort verlässt. Beim Hochladen und in der Lernrunde lädt sich die App nicht mehr von selbst neu. Ein leeres Datum im Klausur-Editor macht den Plan nicht mehr kaputt. „PDF ansehen“ lädt die Datei nicht mehr zusätzlich herunter.' },
+    ],
+  },
+  {
     version: '2026.10.11.1',
     date: '11. Oktober 2026',
     items: [

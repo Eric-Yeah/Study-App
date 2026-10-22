@@ -231,7 +231,7 @@ export function Onboarding() {
             Zurück
           </button>
           {step < steps.length - 1 ? (
-            <button className="btn btn-primary" type="button" onClick={() => canNext && setStep((s) => s + 1)}>
+            <button className="btn btn-primary" type="button" disabled={!canNext} onClick={() => canNext && setStep((s) => s + 1)}>
               Weiter
             </button>
           ) : (

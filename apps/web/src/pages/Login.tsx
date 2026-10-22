@@ -171,7 +171,7 @@ export function Login() {
               className="input"
               type="password"
               required
-              minLength={8}
+              minLength={mode === 'signup' ? 8 : undefined} // beim Anmelden nie sperren: ältere Konten könnten ein kürzeres Passwort haben
               autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
               value={password}
               onChange={(e) => setPassword(e.target.value)}

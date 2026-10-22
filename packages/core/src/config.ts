@@ -220,6 +220,28 @@ export const CONFIG = {
     sportMax: 3, // so viele Sportkurse lassen sich einbringen
     assumption: 8, // Annahme in Punkten für Kurse ohne eigene Zahl, wenn auch keine Note am Fach steht
   },
+  grades: {
+    // Einzelnoten und Kursnote. Wie Lehrkräfte Klausuren und sonstige Leistungen gewichten, regelt die Schule und die Lehrkraft:
+    // das Verhältnis ist darum je Fach einstellbar, dies ist nur der Startwert.
+    writtenShare: 50, // Anteil der Klausuren an der Kursnote in Prozent
+    shareStep: 5,
+    weightMin: 0.5, // Gewicht einer einzelnen Note innerhalb ihrer Gruppe
+    weightMax: 5,
+    weightStep: 0.5,
+    trendWindow: 3, // so viele letzte Noten gegen den Rest für den Trend
+    trendMin: 1, // so viele Punkte Unterschied sind ein Trend
+    maxPerSubject: 200, // Grenze der Einträge je Fach (Schutz vor Unsinn)
+    pendingExamDays: 120, // vergangene Klausuren ohne Note werden so lange angeboten
+    kinds: {
+      exam: { label: 'Klausur', group: 'written', weight: 1 },
+      oral: { label: 'Mündliche Mitarbeit', group: 'other', weight: 1 },
+      test: { label: 'Test', group: 'other', weight: 1 },
+      presentation: { label: 'Referat / Präsentation', group: 'other', weight: 1 },
+      homework: { label: 'Hausaufgabe / Protokoll', group: 'other', weight: 0.5 },
+      project: { label: 'Projekt / Portfolio', group: 'other', weight: 1 },
+      other: { label: 'Sonstiges', group: 'other', weight: 1 },
+    },
+  },
   access: {
     // Konten für Freunde: Freigabe durch den Admin, KI pro Funktion, gemeinsamer Topf der Freunde (Betrag in app_settings)
     friendsBudgetUsd: 3, // Standard des gemeinsamen Topfs, im Admin-Protokoll einstellbar
@@ -332,6 +354,19 @@ export const CONFIG = {
     shortBreakMin: 5,
     longBreakMin: 15,
     sessionsUntilLongBreak: 4,
+  },
+  daily: {
+    // Alltag: "Als Nächstes" auf Heute, Serie, kurze Kartenrunden
+    minSessionMin: 10, // kürzere Einheiten schlägt die App nicht vor (auch nicht für eine kurze Freistunde)
+    minRemainingMin: 5, // weniger Rest eines Blocks zählt als erledigt
+    freeSlotLookaheadMin: 20, // eine Freistunde, die in so vielen Minuten beginnt, gilt schon als Gelegenheit
+    secondsPerCardEstimate: 30, // Schätzung für "ca. 3 min" bei einer Kartenrunde
+    miniRoundCards: 5, // "5 Karten jetzt"
+    secondsPerCardCap: 45, // Lernzeit einer Kartenrunde: höchstens so viele Sekunden je beantworteter Karte (vergessene Tabs zählen nicht)
+    streakMinMinutes: 10, // ab so vielen Minuten Lernzeit zählt ein Tag für die Serie
+    streakGraceEveryDays: 7, // ein Ausfalltag bricht die Serie nicht, höchstens einer in so vielen Tagen
+    streakLookbackDays: 400,
+    overdueTaskDays: 14, // offene Aufgaben der letzten Tage erscheinen noch auf Heute
   },
 } as const;
 

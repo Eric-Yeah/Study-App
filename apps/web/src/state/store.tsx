@@ -1,4 +1,4 @@
-import { CONFIG, emptyPlan, type AbsenceReport, pendingAccess, type AccountAccess, type StyleRecord, type AbiturPlan, type ExamReview, type PracticeRecord, type SubjectRubric, type Flashcard, type Quarter, type Exam, type PlanSettings, type Role, type Stage, type Subject, type SubstitutionEntry, type Timetable, type Effort, type Legibility, type WorksheetSummary } from '@study/core';
+import { CONFIG, emptyPlan, type AbsenceReport, pendingAccess, type AccountAccess, type StyleRecord, type AbiturPlan, emptyGradeSettings, type GradeEntry, type GradeSettings, type ExamReview, type PracticeRecord, type SubjectRubric, type Flashcard, type Quarter, type Exam, type PlanSettings, type Role, type Stage, type Subject, type SubstitutionEntry, type Timetable, type Effort, type Legibility, type WorksheetSummary } from '@study/core';
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
 import { SplashScreen } from '../components/SplashScreen';
 import { loadRemote, persist, pickRemote, subscribeChanges, type RemoteData } from './remote';
@@ -131,6 +131,8 @@ export interface AppState {
   rubrics: SubjectRubric[]; // Korrekturmuster pro Fach, nur wenn es vom Standard abweicht
   practiceExams: PracticeRecord[];
   abiturPlan: AbiturPlan; // Eingaben im Abiturrechner
+  grades: GradeEntry[]; // Einzelnoten (Klausur, mündlich, Test ...), daraus die Kursnote
+  gradeSettings: GradeSettings; // Anteil der Klausuren an der Kursnote je Fach
   taskStyles: StyleRecord[]; // gelernter Stil der echten Aufgabenblätter, pro Fach und Lehrkraft
   account: AccountAccess; // Freigabe, Admin, freigeschaltete KI-Funktionen (nur lesen, ändert der Admin)
 }
@@ -170,6 +172,8 @@ export const initialState: AppState = {
   rubrics: [],
   practiceExams: [],
   abiturPlan: emptyPlan(),
+  grades: [],
+  gradeSettings: emptyGradeSettings(),
   taskStyles: [],
   account: pendingAccess(),
 };
@@ -202,6 +206,9 @@ export type Action =
   | { type: 'deleteReview'; id: string }
   | { type: 'upsertRubric'; rubric: SubjectRubric }
   | { type: 'setAbiturPlan'; plan: AbiturPlan }
+  | { type: 'upsertGrade'; grade: GradeEntry }
+  | { type: 'deleteGrade'; id: string }
+  | { type: 'setGradeSettings'; settings: GradeSettings }
   | { type: 'upsertStyle'; style: StyleRecord }
   | { type: 'deleteStyle'; id: string }
   | { type: 'upsertPractice'; practice: PracticeRecord }
@@ -238,9 +245,16 @@ export function reducer(state: AppState, action: Action): AppState {
         subjects: state.subjects.filter((s) => s.id !== action.id),
         exams: state.exams.filter((e) => e.subjectId !== action.id),
         rubrics: state.rubrics.filter((r) => r.subjectId !== action.id),
+        grades: state.grades.filter((g) => g.subjectId !== action.id),
         practiceExams: state.practiceExams.map((p) => (p.subjectId === action.id ? { ...p, subjectId: null } : p)),
         examReviews: state.examReviews.map((r) => (r.subjectId === action.id ? { ...r, subjectId: null } : r)),
         topics: state.topics.filter((t) => state.exams.find((e) => e.id === t.examId)?.subjectId !== action.id),
+        // Wie in der Datenbank: Verknüpfungen werden leer (on delete set null), der Aufgabenstil geht mit
+        tasks: state.tasks.map((t) => (t.subjectId === action.id ? { ...t, subjectId: null } : t)),
+        sessions: state.sessions.map((s) => (s.subjectId === action.id ? { ...s, subjectId: null } : s)),
+        notes: state.notes.map((n) => (n.subjectId === action.id ? { ...n, subjectId: null } : n)),
+        cards: state.cards.map((c) => (c.subjectId === action.id ? { ...c, subjectId: null } : c)),
+        taskStyles: state.taskStyles.filter((t) => t.subjectId !== action.id),
       };
     case 'upsertExam':
       return { ...state, exams: upsert(state.exams, action.exam) };
@@ -249,6 +263,7 @@ export function reducer(state: AppState, action: Action): AppState {
         ...state,
         exams: state.exams.filter((e) => e.id !== action.id),
         topics: state.topics.filter((t) => t.examId !== action.id),
+        grades: state.grades.map((g) => (g.examId === action.id ? { ...g, examId: null } : g)), // die Note bleibt, nur die Verknüpfung fällt weg
       };
     case 'setPlan':
       return { ...state, plan: { ...state.plan, ...action.plan } };
@@ -257,7 +272,7 @@ export function reducer(state: AppState, action: Action): AppState {
     case 'setTheme':
       return { ...state, theme: action.theme };
     case 'addSession':
-      return { ...state, sessions: [...state.sessions, action.session] };
+      return { ...state, sessions: upsert(state.sessions, action.session) };
     case 'setCheckin':
       return {
         ...state,
@@ -309,6 +324,12 @@ export function reducer(state: AppState, action: Action): AppState {
       };
     case 'setAbiturPlan':
       return { ...state, abiturPlan: action.plan };
+    case 'upsertGrade':
+      return { ...state, grades: upsert(state.grades, action.grade) };
+    case 'deleteGrade':
+      return { ...state, grades: state.grades.filter((g) => g.id !== action.id) };
+    case 'setGradeSettings':
+      return { ...state, gradeSettings: action.settings };
     case 'upsertStyle':
       return { ...state, taskStyles: upsert(state.taskStyles, action.style) };
     case 'deleteStyle':

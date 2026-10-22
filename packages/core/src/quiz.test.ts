@@ -51,6 +51,10 @@ describe('Antworten prüfen', () => {
     expect(normalizeAnswer('  Größe!  ')).toBe('grosse');
     expect(normalizeAnswer('Dr. Müller, bitte')).toBe('dr muller bitte');
     expect(normalizeAnswer('n = c / v')).toBe('n = c / v');
+    // Dezimalzeichen: 1,5 ist nicht 15, Punkt und Komma gelten gleich
+    expect(normalizeAnswer('1,5')).toBe('1,5');
+    expect(normalizeAnswer('1.5')).toBe('1,5');
+    expect(normalizeAnswer('Satz. 3,14!')).toBe('satz 3,14');
   });
 
   it('mehrere richtige Antworten', () => {
@@ -69,6 +73,10 @@ describe('Antworten prüfen', () => {
     expect(checkTyped('  HERTZ ', 'Hertz').result).toBe('correct');
     expect(checkTyped('Hertz.', 'Hertz').result).toBe('correct');
     expect(checkTyped('Hertzz', 'Hertz').result).toBe('close');
+    // Zahlen: eine falsche Ziffer ist kein Tippfehler
+    expect(checkTyped('13,5', '12,5').result).toBe('wrong');
+    expect(checkTyped('125', '12,5').result).toBe('wrong');
+    expect(checkTyped('12.5', '12,5').result).toBe('correct');
     expect(checkTyped('Herz', 'Hertz').result).toBe('close');
     expect(checkTyped('Newton', 'Hertz').result).toBe('wrong');
     expect(checkTyped('', 'Hertz').result).toBe('wrong');

@@ -1,5 +1,5 @@
 import { LANGUAGE_LABELS, isLanguageSubject, priorityBreakdown, type Subject } from '@study/core';
-import { ChevronDown, GraduationCap, ListChecks, Plus } from 'lucide-react';
+import { ChevronDown, ListChecks, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import { SubjectEditor } from '../components/SubjectEditor';
@@ -40,9 +40,6 @@ export function Subjects() {
           </p>
         </div>
         <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
-          <Link className="btn" to="/abitur">
-            <GraduationCap size={18} aria-hidden="true" /> Abiturrechner
-          </Link>
           <button type="button" className="btn btn-primary" onClick={add}>
             <Plus size={18} aria-hidden="true" /> Fach hinzufügen
           </button>

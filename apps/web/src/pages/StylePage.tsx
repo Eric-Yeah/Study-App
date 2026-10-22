@@ -46,7 +46,7 @@ export function StylePage() {
     return (
       <div className="card stack">
         <p className="muted">Dieses Fach gibt es nicht mehr.</p>
-        <Link className="btn" to="/notizen?ansicht=klausuren">
+        <Link className="btn" to="/korrektur/uebung">
           Zu den Klausuren
         </Link>
       </div>
@@ -115,7 +115,7 @@ export function StylePage() {
           <h1>Aufgabenstil · {subject.name}</h1>
           <p className="sub">Lade Aufgabenblätter deiner Lehrkraft hoch. Die KI liest ab, wie sie Aufgaben stellt, und Übungsklausuren folgen diesem Stil.</p>
         </div>
-        <Link className="btn" to="/notizen?ansicht=klausuren">
+        <Link className="btn" to="/korrektur/uebung">
           <ArrowLeft size={16} aria-hidden="true" /> Zurück
         </Link>
       </div>

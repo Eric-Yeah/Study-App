@@ -131,6 +131,21 @@ export function cardStats(cards: readonly Flashcard[], today: string, subjectId?
 
 const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+/**
+ * Sucht einen Begriff als ganzes Wort. Ältere Browser (vor Safari 16.4) kennen kein Lookbehind: dann gilt eine Schreibweise ohne,
+ * bei der das Zeichen davor mitgefunden und wieder eingesetzt wird.
+ */
+function wholeWord(term: string): { test: (text: string) => boolean; blank: (text: string) => string } {
+  const t = escapeRegExp(term);
+  try {
+    const re = new RegExp(`(?<![\\p{L}\\p{N}])${t}(?![\\p{L}\\p{N}])`, 'giu');
+    return { test: (s) => ((re.lastIndex = 0), re.test(s)), blank: (s) => s.replace(re, '_____') };
+  } catch {
+    const re = new RegExp(`(^|[^\\p{L}\\p{N}])${t}(?![\\p{L}\\p{N}])`, 'giu');
+    return { test: (s) => ((re.lastIndex = 0), re.test(s)), blank: (s) => s.replace(re, (_m, before: string) => `${before}_____`) };
+  }
+}
+
 export interface CardSuggestion {
   front: string;
   back: string;
@@ -164,9 +179,9 @@ export function suggestCards(
     const text = sentence.trim();
     if (text.length < cfg.minSentenceChars) continue;
     for (const term of terms) {
-      const re = new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(term)}(?![\\p{L}\\p{N}])`, 'giu');
-      if (!re.test(text)) continue;
-      const blanked = text.replace(re, '_____');
+      const word = wholeWord(term);
+      if (!word.test(text)) continue;
+      const blanked = word.blank(text);
       if (blanked.replace(/_____/g, '').trim().length < 15 || term.length > text.length * 0.6) continue;
       add(blanked, `${term}\n\n${text}`, 2); // Lückenkarten: Mittel
       break; // eine Karte je Satz

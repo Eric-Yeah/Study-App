@@ -50,9 +50,14 @@ export function FitnessLink() {
     setError(null);
     setCopied(false);
     const t = newToken();
-    const { error: err } = await supabase
-      .from('fitness_links')
-      .insert({ user_id: userId, token_hash: await sha256Hex(t), label: 'Overload' });
+    let hash: string;
+    try {
+      hash = await sha256Hex(t);
+    } catch {
+      setError('Dieser Browser kann den Code nicht sicher erzeugen. Öffne die App über https.');
+      return;
+    }
+    const { error: err } = await supabase.from('fitness_links').insert({ user_id: userId, token_hash: hash, label: 'Overload' });
     if (err) {
       setError('Code konnte nicht erzeugt werden.');
       return;

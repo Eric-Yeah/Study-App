@@ -151,7 +151,7 @@ export function ExamCorrect() {
           <h1>Klausur korrigieren lassen</h1>
           <p className="sub">Die KI korrigiert nach dem Korrekturmuster des Fachs, die Note rechnet die App nach den Regeln der OAVO.</p>
         </div>
-        <Link className="btn" to={practice ? `/korrektur/uebung/${practice.id}` : '/notizen?ansicht=klausuren'}>
+        <Link className="btn" to={practice ? `/korrektur/uebung/${practice.id}` : '/korrektur'}>
           <ArrowLeft size={16} aria-hidden="true" /> Zurück
         </Link>
       </div>
@@ -294,6 +294,7 @@ export function ExamCorrect() {
               value={horizonText}
               maxLength={CONFIG.exam.maxHorizonChars}
               disabled={busy}
+              aria-label="Erwartungshorizont eintippen"
               placeholder="Oder hier eintippen, zum Beispiel: Aufgabe 1 (10 BE): Einleitung mit Autor, Titel, Thema …"
               onChange={(e) => setHorizonText(e.target.value)}
             />

@@ -37,7 +37,9 @@ export function ExamEditor() {
       },
   );
   const subject = state.subjects.find((s) => s.id === draft.subjectId);
-  const plan = useMemo(() => (subject ? planExam(subject, draft, state.plan) : null), [subject, draft, state.plan]);
+  // Ein geleertes Datumsfeld würde den ganzen Plan ungültig machen (NaN): dann gibt es keine Berechnung und kein Speichern
+  const validDate = /^\d{4}-\d{2}-\d{2}$/.test(draft.date);
+  const plan = useMemo(() => (subject && validDate ? planExam(subject, draft, state.plan) : null), [subject, validDate, draft, state.plan]);
 
   if (selectable.length === 0) {
     return (
@@ -153,6 +155,11 @@ export function ExamEditor() {
           )}
         </div>
 
+        {!plan && subject && !validDate && (
+          <div className="card stack">
+            <p className="notice">Wähle ein Datum, dann rechnet die App den Plan.</p>
+          </div>
+        )}
         {plan && (
           <div className="stack">
             <div className="card stack" style={{ gap: 16 }}>
@@ -236,7 +243,7 @@ export function ExamEditor() {
           <Link className="btn" to="/plan">
             Abbrechen
           </Link>
-          <button type="button" className="btn btn-primary" onClick={save}>
+          <button type="button" className="btn btn-primary" onClick={save} disabled={!validDate || !draft.subjectId}>
             Speichern
           </button>
         </div>

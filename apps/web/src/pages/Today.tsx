@@ -1,16 +1,24 @@
-import { parseLocal, toIsoDate } from '@study/core';
-import { Check, ChevronRight, Plus, Trash2 } from 'lucide-react';
+import { parseLocal, sessionLength, toIsoDate } from '@study/core';
+import { Check, ChevronRight, Play, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ConcentrationCard } from '../components/ConcentrationCard';
 import { AbsencesCard } from '../components/AbsencesCard';
 import { SchoolDay } from '../components/SchoolDay';
+import { CardsDueCard } from '../components/today/CardsDueCard';
+import { NextUpCard } from '../components/today/NextUpCard';
+import { PushNudge } from '../components/today/PushNudge';
+import { StreakRow } from '../components/today/StreakRow';
 import { formatDateLong, formatDateShort, formatDays, formatMinutes, uid } from '../lib/format';
+import { minutesBySubject, nextUpFor, openTasksFor } from '../state/daily';
 import { blocksForDate, combinedPlan, examsWithPlans, learnedMinutesOn, upcoming } from '../state/selectors';
 import { useStore } from '../state/store';
+import { useTimer } from '../timer/TimerProvider';
 
 export function Today() {
   const { state, dispatch } = useStore();
+  const timer = useTimer();
+  const navigate = useNavigate();
   const [title, setTitle] = useState('');
   const today = new Date();
   const iso = toIsoDate(today);
@@ -21,8 +29,9 @@ export function Today() {
   const droppedToday = todayOverride?.capacityMin === 0;
   const goal = blocks.reduce((s, b) => s + b.minutes, 0);
   const learned = learnedMinutesOn(state.sessions, iso);
-  const next = upcoming(list)[0];
+  const nextExam = upcoming(list)[0];
   const tasks = state.tasks.filter((t) => t.date === iso);
+  const overdue = openTasksFor(state, iso).filter((t) => t.date < iso);
   const subjectName = (id: string | null) => state.subjects.find((s) => s.id === id)?.name;
   const nextStart = upcoming(list)
     .filter((x) => x.plan.hasPlan && x.plan.totalHours.value > 0)
@@ -34,6 +43,39 @@ export function Today() {
     .filter((x) => toIsoDate(x.date) > iso)
     .sort((a, b) => a.date.getTime() - b.date.getTime())[0];
 
+  // Das, was jetzt dran ist, und der Ein-Tipp-Start für die geplanten Blöcke
+  const { next, slot } = nextUpFor(state, today, { list, blocks });
+  const learnedBySubject = minutesBySubject(state, iso);
+  const plannedBySubject = blocks.reduce<Record<string, number>>((m, b) => ({ ...m, [b.item.subject.id]: (m[b.item.subject.id] ?? 0) + b.minutes }), {});
+  const startBlock = (subjectId: string) => {
+    const remaining = (plannedBySubject[subjectId] ?? 0) - (learnedBySubject[subjectId] ?? 0);
+    if (timer.state.status === 'idle') timer.startWith({ subjectId, minutes: sessionLength(state.timer.focusMin, remaining > 0 ? remaining : null, slot) });
+    navigate('/fokus');
+  };
+
+  const taskRow = (t: (typeof tasks)[number], note?: string) => (
+    <div key={t.id} className="task">
+      <button
+        type="button"
+        className="check"
+        role="checkbox"
+        aria-checked={t.done}
+        aria-label={`${t.title} erledigt`}
+        onClick={() => dispatch({ type: 'toggleTask', id: t.id })}
+      >
+        {t.done && <Check size={14} aria-hidden="true" />}
+      </button>
+      <span style={{ flex: 1 }} className={t.done ? 'done-text' : ''}>
+        {t.title}
+        {t.subjectId && <span className="hint"> · {subjectName(t.subjectId)}</span>}
+        {note && <span className="hint"> · {note}</span>}
+      </span>
+      <button type="button" className="btn btn-ghost btn-icon" aria-label="Aufgabe löschen" onClick={() => dispatch({ type: 'deleteTask', id: t.id })}>
+        <Trash2 size={16} aria-hidden="true" />
+      </button>
+    </div>
+  );
+
   return (
     <div className="stack" style={{ gap: 20 }}>
       <div className="page-head">
@@ -41,10 +83,9 @@ export function Today() {
           <h1>{state.profile?.name ? `Hallo ${state.profile.name}` : 'Heute'}</h1>
           <p className="sub">{formatDateLong(today)}</p>
         </div>
-        <Link className="btn btn-primary" to="/fokus">
-          Fokus starten
-        </Link>
       </div>
+
+      <NextUpCard list={list} next={next} slot={slot} />
 
       {[5, 6, 0, 1].includes(today.getDay()) && (
         <Link to={today.getDay() === 1 ? '/rueckblick?zurueck=1' : '/rueckblick'} className="card review-teaser">
@@ -78,6 +119,7 @@ export function Today() {
                 ? 'Tagesziel erreicht.'
                 : `Noch ${formatMinutes(goal - learned)} bis zum Tagesziel.`}
           </p>
+          <StreakRow />
           {list.length > 0 && (
             <button
               type="button"
@@ -90,81 +132,73 @@ export function Today() {
           )}
         </div>
 
-        {next ? (
-          <Link to={`/klausur/${next.exam.id}`} className="card stack" style={{ textDecoration: 'none', color: 'inherit', background: 'var(--warn-soft)', borderColor: 'transparent' }}>
-            <p className="muted" style={{ color: 'var(--warn)' }}>
-              Nächste Klausur
-            </p>
-            <div className="between">
-              <div>
-                <h2 style={{ color: 'var(--warn)' }}>{next.exam.title || next.subject.name}</h2>
-                <p style={{ color: 'var(--warn)' }}>
-                  {next.subject.name} · {formatDateShort(next.exam.date)}
-                </p>
+        <div className="stack">
+          {nextExam ? (
+            <Link to={`/klausur/${nextExam.exam.id}`} className="card stack" style={{ textDecoration: 'none', color: 'inherit', background: 'var(--warn-soft)', borderColor: 'transparent' }}>
+              <p className="muted" style={{ color: 'var(--warn)' }}>
+                Nächste Klausur
+              </p>
+              <div className="between">
+                <div>
+                  <h2 style={{ color: 'var(--warn)' }}>{nextExam.exam.title || nextExam.subject.name}</h2>
+                  <p style={{ color: 'var(--warn)' }}>
+                    {nextExam.subject.name} · {formatDateShort(nextExam.exam.date)}
+                  </p>
+                </div>
+                <span className="big-num" style={{ color: 'var(--warn)' }}>
+                  {nextExam.plan.daysLeft === 0 ? 'Heute' : formatDays(nextExam.plan.daysLeft)}
+                </span>
               </div>
-              <span className="big-num" style={{ color: 'var(--warn)' }}>
-                {next.plan.daysLeft === 0 ? 'Heute' : formatDays(next.plan.daysLeft)}
-              </span>
-            </div>
-          </Link>
-        ) : (
-          <div className="card stack">
-            <h2>Keine Klausur geplant</h2>
-            <p className="muted">Trag deine nächste Klausur ein, dann schlägt die App Vorlauf und Lernzeit vor.</p>
-            <Link className="btn" to="/klausur/neu">
-              <Plus size={18} aria-hidden="true" /> Klausur anlegen
             </Link>
-          </div>
-        )}
+          ) : (
+            <div className="card stack">
+              <h2>Keine Klausur geplant</h2>
+              <p className="muted">Trag deine nächste Klausur ein, dann schlägt die App Vorlauf und Lernzeit vor.</p>
+              <Link className="btn" to="/klausur/neu">
+                <Plus size={18} aria-hidden="true" /> Klausur anlegen
+              </Link>
+            </div>
+          )}
+          {next.kind !== 'cards' && <CardsDueCard />}
+        </div>
       </div>
 
       <SchoolDay />
 
       <AbsencesCard />
 
+      <PushNudge />
+
       <ConcentrationCard plannedMin={goal} />
 
       {blocks.length > 0 && (
         <div className="card stack">
           <h2>Heute geplant</h2>
-          {blocks.map(({ item, minutes }) => (
-            <div key={item.exam.id} className="between">
-              <div className="row">
-                <span className="dot" style={{ background: item.subject.color }} />
-                <span>
-                  {item.subject.name}: {item.exam.title || 'Klausur'}
+          {blocks.map(({ item, minutes }) => {
+            const done = (learnedBySubject[item.subject.id] ?? 0) >= (plannedBySubject[item.subject.id] ?? 0);
+            return (
+              <button key={item.exam.id} type="button" className="plan-row" onClick={() => startBlock(item.subject.id)} aria-label={`${item.subject.name} lernen, ${formatMinutes(minutes)} geplant`}>
+                <span className="row" style={{ gap: 10, minWidth: 0 }}>
+                  <span className="dot" style={{ background: item.subject.color }} />
+                  <span className={`plan-row-name${done ? ' done-text' : ''}`}>
+                    {item.subject.name}: {item.exam.title || 'Klausur'}
+                  </span>
                 </span>
-              </div>
-              <span className="muted">{formatMinutes(minutes)}</span>
-            </div>
-          ))}
+                <span className="row" style={{ gap: 10, flex: 'none' }}>
+                  <span className="muted">{done ? 'erledigt' : formatMinutes(minutes)}</span>
+                  <Play size={16} aria-hidden="true" />
+                </span>
+              </button>
+            );
+          })}
         </div>
       )}
 
       <div className="card">
         <h2 style={{ marginBottom: 8 }}>Aufgaben</h2>
-        {tasks.length === 0 && <p className="hint">Noch keine Aufgaben für heute.</p>}
-        {tasks.map((t) => (
-          <div key={t.id} className="task">
-            <button
-              type="button"
-              className="check"
-              role="checkbox"
-              aria-checked={t.done}
-              aria-label={`${t.title} erledigt`}
-              onClick={() => dispatch({ type: 'toggleTask', id: t.id })}
-            >
-              {t.done && <Check size={14} aria-hidden="true" />}
-            </button>
-            <span style={{ flex: 1 }} className={t.done ? 'done-text' : ''}>
-              {t.title}
-              {t.subjectId && <span className="hint"> · {subjectName(t.subjectId)}</span>}
-            </span>
-            <button type="button" className="btn btn-ghost btn-icon" aria-label="Aufgabe löschen" onClick={() => dispatch({ type: 'deleteTask', id: t.id })}>
-              <Trash2 size={16} aria-hidden="true" />
-            </button>
-          </div>
-        ))}
+        {tasks.length === 0 && overdue.length === 0 && <p className="hint">Noch keine Aufgaben für heute. Über das Plus unten rechts legst du schnell eine an.</p>}
+        {overdue.map((t) => taskRow(t, `offen seit ${formatDateShort(t.date)}`))}
+        {tasks.map((t) => taskRow(t))}
         <form
           className="row"
           style={{ marginTop: 12 }}

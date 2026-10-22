@@ -52,6 +52,20 @@ export function Abitur() {
     return () => window.clearTimeout(t);
   }, [plan, dispatch]);
 
+  // Wer die Seite innerhalb der 700 ms verlässt, soll die letzte Eingabe nicht verlieren
+  const latest = useRef(plan);
+  latest.current = plan;
+  useEffect(
+    () => () => {
+      const json = JSON.stringify(latest.current);
+      if (json !== baseRef.current) {
+        baseRef.current = json;
+        dispatch({ type: 'setAbiturPlan', plan: latest.current });
+      }
+    },
+    [dispatch],
+  );
+
   const subjects = state.subjects;
   const result = useMemo(() => computeAbitur(subjects, plan), [subjects, plan]);
   const byId = useMemo(() => new Map(subjects.map((s) => [s.id, s])), [subjects]);

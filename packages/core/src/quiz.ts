@@ -40,7 +40,9 @@ export const answerOf = (card: Pick<Flashcard, 'back'>): string =>
 /** Zum Vergleichen: ohne Akzente, Groß- und Kleinschreibung und Satzzeichen, Rechenzeichen bleiben, Leerraum zusammengefasst. */
 export const normalizeAnswer = (text: string): string =>
   fold(text)
-    .replace(/[^\p{L}\p{N}=+\-*/^()<>]+/gu, ' ')
+    .replace(/(\d)[.,](?=\d)/g, '$1\uE000') // Dezimalzeichen bleibt: 1,5 ist nicht 15, und 1.5 gilt wie 1,5
+    .replace(/[^\p{L}\p{N}=+\-*/^()<>\uE000]+/gu, ' ')
+    .replace(/\uE000/g, ',')
     .replace(/\s+/g, ' ')
     .trim();
 
@@ -78,7 +80,8 @@ export function checkTyped(input: string, back: string): { result: TypedResult; 
   let close = false;
   for (const candidate of answerCandidates(back)) {
     if (typed === candidate || squash(typed) === squash(candidate)) return { result: 'correct', expected };
-    const allowed = candidate.length < 4 ? 0 : candidate.length < 8 ? 1 : 2;
+    // Zahlen und Formeln (mit Ziffern) müssen stimmen: 12,5 statt 13,5 ist kein Tippfehler
+    const allowed = /\d/.test(candidate) || candidate.length < 4 ? 0 : candidate.length < 8 ? 1 : 2;
     if (allowed > 0 && levenshtein(typed, candidate) <= allowed) close = true;
   }
   return { result: close ? 'close' : 'wrong', expected };

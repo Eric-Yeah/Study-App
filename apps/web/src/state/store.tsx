@@ -1,4 +1,4 @@
-import { CONFIG, emptyPlan, pendingAccess, type AccountAccess, type StyleRecord, type AbiturPlan, emptyGradeSettings, type GradeEntry, type GradeSettings, type ExamReview, type PracticeRecord, type SubjectRubric, type Flashcard, type Quarter, type Exam, type PlanSettings, type Role, type Stage, type Subject, type SubstitutionEntry, type Timetable, type Effort, type Legibility, type WorksheetSummary } from '@study/core';
+import { CONFIG, emptyPlan, type AbsenceReport, pendingAccess, type AccountAccess, type StyleRecord, type AbiturPlan, emptyGradeSettings, type GradeEntry, type GradeSettings, type ExamReview, type PracticeRecord, type SubjectRubric, type Flashcard, type Quarter, type Exam, type PlanSettings, type Role, type Stage, type Subject, type SubstitutionEntry, type Timetable, type Effort, type Legibility, type WorksheetSummary } from '@study/core';
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
 import { SplashScreen } from '../components/SplashScreen';
 import { loadRemote, persist, pickRemote, subscribeChanges, type RemoteData } from './remote';
@@ -122,6 +122,9 @@ export interface AppState {
   timetableAt: string | null;
   substitutions: SubstitutionEntry[];
   substitutionsAt: string | null;
+  /** Fehlstunden aus Lanis (Mein Unterricht), null solange nie gelesen */
+  absences: AbsenceReport | null;
+  absencesAt: string | null;
   notes: LessonNote[];
   cards: Flashcard[];
   examReviews: ExamReview[];
@@ -161,6 +164,8 @@ export const initialState: AppState = {
   timetableAt: null,
   substitutions: [],
   substitutionsAt: null,
+  absences: null,
+  absencesAt: null,
   notes: [],
   cards: [],
   examReviews: [],
@@ -190,6 +195,7 @@ export type Action =
   | { type: 'setDayOverride'; date: string; capacityMin: number | null }
   | { type: 'setTimetable'; timetable: Timetable; at: string }
   | { type: 'setSubstitutions'; substitutions: SubstitutionEntry[]; at: string }
+  | { type: 'setAbsences'; absences: AbsenceReport; at: string }
   | { type: 'upsertNote'; note: LessonNote }
   | { type: 'deleteNote'; id: string }
   | { type: 'upsertCard'; card: Flashcard }
@@ -288,6 +294,8 @@ export function reducer(state: AppState, action: Action): AppState {
       return { ...state, timetable: action.timetable, timetableAt: action.at };
     case 'setSubstitutions':
       return { ...state, substitutions: action.substitutions, substitutionsAt: action.at };
+    case 'setAbsences':
+      return { ...state, absences: action.absences, absencesAt: action.at };
     case 'upsertNote':
       return { ...state, notes: upsert(state.notes, action.note) };
     case 'deleteNote':

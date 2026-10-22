@@ -12,6 +12,23 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '2026.10.22.2',
+    date: '22. Oktober 2026',
+    items: [
+      { icon: '🩺', title: 'Fehlstunden aus Lanis', text: 'Die App liest jetzt auch deine eingetragenen Fehlstunden aus Lanis („Mein Unterricht“, Anwesenheit). Sobald irgendwo eine Fehlzeit steht, erscheint auf Heute die Karte „Fehlstunden“ mit der Summe und den Kursen, in denen du gefehlt hast. Sind Stunden noch unentschuldigt, weist die App darauf hin. Die Zahlen führt die Schule, die App zeigt sie nur an. Sie werden mit dem Stundenplan aktualisiert (etwa alle 12 Stunden).' },
+      { icon: '📋', title: 'Vertretungsplan aus DSBmobile', text: 'Steht der Vertretungsplan deiner Schule in der App „DSBmobile“ statt in Lanis? Unter Einstellungen → Vertretungsplan (DSBmobile) gibst du die Zugangsdaten der Schule ein. Die App holt dann den Plan der ganzen Schule und zeigt dir auf Heute nur, was deine Stufe und deine Stunden betrifft. Das Passwort bleibt verschlüsselt nur auf deinem Gerät. Du brauchst dafür deinen Stundenplan aus Lanis.' },
+    ],
+  },
+  {
+    version: '2026.10.22.1',
+    date: '22. Oktober 2026',
+    items: [
+      { icon: '✅', title: 'Zuverlässigere KI-Antworten', text: 'Zusammenfassungen, Korrekturen, Themenvorschläge und der Aufgabenstil kommen jetzt immer in der richtigen Form an. Die Meldung „Die Antwort der KI konnte nicht gelesen werden“ sollte damit kaum noch vorkommen.' },
+      { icon: '📄', title: 'Kleinere PDFs', text: 'Fotos in deinen Notiz-PDFs werden etwas kleiner gespeichert. Sie bleiben gut lesbar und brauchen weniger Speicher.' },
+      { icon: '💸', title: 'Kostengrenze genauer, Speicher geschont', text: 'Die Sicherung vor jeder KI-Anfrage rechnet Bilder jetzt nach ihren echten Maßen (A4 mit 1600 px etwa 2.400 statt pauschal 3.400 Token) und bleibt trotzdem immer eine Obergrenze: Unlesbare oder sehr große Bilder zählen mit dem Höchstwert des Modells (4.784 Token), Haiku über 100.000 Token mit dem höheren Preis. Strukturierte Ausgabe spart bezahlte Fehlversuche. Erinnerungen laufen im Minutentakt statt alle 10 Sekunden, das Cron-Protokoll wird täglich aufgeräumt (sonst bis zu 250 MB Datenbank im Monat). PDF-Fotos mit 1600 px und Qualität 0,75 sparen etwa ein Drittel Speicher.', only: 'admin' },
+    ],
+  },
+  {
     version: '2026.10.21.5',
     date: '21. Oktober 2026',
     items: [

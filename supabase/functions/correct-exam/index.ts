@@ -10,12 +10,15 @@
 // - mode 'learn': { reviewId, pages: [... role 'korrigiert'] } vergleicht die gespeicherte KI-Korrektur mit der Korrektur der
 //   Lehrkraft. Antwort: { learn: { teacherPoints, tasks, lessons } }. Gespeichert wird erst, wenn der Nutzer bestätigt.
 // - Kostengrenze wie bei summarize-worksheet: vor jeder Anfrage der schlimmste Fall mit dem Preis des Modells (CONFIG.ai).
-//   Modell CONFIG.ai.models.exam, Effort über output_config.effort, kein thinking, temperature, top_p oder top_k.
+//   Modell CONFIG.ai.models.exam, Effort über output_config.effort, Antwort als JSON-Schema über output_config.format,
+//   kein thinking, temperature, top_p oder top_k.
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { CONFIG } from '../_shared/config.ts';
 import {
   EXAM_PAGE_ROLES,
+  EXAM_RESULT_SCHEMA,
+  LEARN_SCHEMA,
   defaultRubric,
   examLanguageNote,
   examPrompt,
@@ -30,7 +33,7 @@ import {
   type ExamResult,
   type Lesson,
 } from '../_shared/examGrading.ts';
-import { costUsd, fitsBudget, spentUsd, worstCaseUsd, type ModelChoice } from '../_shared/worksheets.ts';
+import { costUsd, fitsBudget, imageTokenBound, jpegSize, outputConfig, worstCaseUsd, type ModelChoice } from '../_shared/worksheets.ts';
 import { GateError, openGate, type Gate } from '../_shared/gate.ts';
 
 const API_URL = 'https://api.anthropic.com/v1/messages';
@@ -292,6 +295,8 @@ Deno.serve(async (req) => {
           if (error || !file) throw new Failure('not_found');
           const bytes = new Uint8Array(await file.arrayBuffer());
           if (bytes.byteLength > MAX_IMAGE_BYTES) throw new Failure('bad_request');
+          // Obergrenze der Bild-Tokens aus den echten Maßen, für die Kostengrenze (ohne lesbare Maße: Höchstwert)
+          page.tokens = imageTokenBound(jpegSize(bytes), CONFIG.ai);
           content.push({ type: 'text', text: `${ROLE_LABEL[role]} Seite ${n} (Bild):` });
           content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: toBase64(bytes) } });
         }
@@ -315,7 +320,8 @@ Deno.serve(async (req) => {
             max_tokens: maxTokens,
             system,
             messages: [{ role: 'user', content }],
-            output_config: { effort: choice.effort },
+            // Strukturierte Ausgabe nach dem Schema des Modus, die Parser bleiben als Sicherung
+            output_config: outputConfig(choice.effort, mode === 'grade' ? EXAM_RESULT_SCHEMA : LEARN_SCHEMA),
           }),
         });
 

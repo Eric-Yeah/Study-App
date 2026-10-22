@@ -8,7 +8,8 @@
 
 export type Effort = 'low' | 'medium' | 'high';
 
-export type WorksheetPage = { type: 'text'; text: string } | { type: 'image'; path: string };
+/** Bildseite: tokens setzt erst die Edge Function nach dem Laden (obere Grenze aus den echten Bildmaßen, siehe imageTokenBound). */
+export type WorksheetPage = { type: 'text'; text: string } | { type: 'image'; path: string; tokens?: number };
 
 export type Legibility = 'sicher' | 'unsicher';
 
@@ -29,6 +30,32 @@ export interface SummaryLimits {
   terms: number;
   formulas: number;
   openQuestions: number;
+}
+
+/**
+ * JSON-Schema der Zusammenfassung für die strukturierte Ausgabe (output_config.format). Claude hält sich dann sicher an die Form,
+ * parseSummary bleibt als Sicherung (Längen, Grenzen, Antworten ohne Schema).
+ */
+export const SUMMARY_SCHEMA = {
+  type: 'object',
+  properties: {
+    thema: { type: 'string' },
+    kernaussagen: { type: 'array', items: { type: 'string' } },
+    begriffe: { type: 'array', items: { type: 'string' } },
+    formeln: { type: 'array', items: { type: 'string' } },
+    offene_fragen: { type: 'array', items: { type: 'string' } },
+    lesbarkeit: { type: 'string', enum: ['sicher', 'unsicher'] },
+  },
+  required: ['thema', 'kernaussagen', 'begriffe', 'formeln', 'offene_fragen', 'lesbarkeit'],
+  additionalProperties: false,
+} as const;
+
+/**
+ * output_config einer Anfrage: Effort und, wenn ein Schema da ist, die strukturierte Ausgabe als JSON
+ * ({ type: 'json_schema', schema }). Beides gehört in dasselbe Objekt.
+ */
+export function outputConfig(effort: Effort, schema?: object): { effort: Effort; format?: { type: 'json_schema'; schema: object } } {
+  return schema ? { effort, format: { type: 'json_schema', schema } } : { effort };
 }
 
 /** System-Prompt für die KI. Die Längenvorgaben halten die Ausgabe kurz, und Ausgabe-Tokens sind die teuren. */
@@ -73,13 +100,19 @@ export type AiModels = Record<AiTask, { model: string; effort: Effort }>;
 export interface ModelPrice {
   inputUsdPerMTok: number;
   outputUsdPerMTok: number;
+  // Höherer Preis für lange Anfragen (Haiku 5.5: mehr als 100.000 Token Eingabe). Gilt dann für die ganze Anfrage.
+  longAboveInputTokens?: number;
+  longInputUsdPerMTok?: number;
+  longOutputUsdPerMTok?: number;
 }
 
 /** Preise je Modell und Schätzwerte, kommen aus CONFIG.ai. */
 export interface AiPricing {
   prices: Record<string, ModelPrice>;
   maxTokens: number;
-  maxImageTokens: number;
+  maxImageTokens: number; // Höchstwert je Bild, gilt, wenn die Maße nicht bekannt sind
+  imagePatchPx: number; // Kantenlänge einer Bildkachel (ein Token je Kachel)
+  imageTokenMargin: number; // Sicherheitszuschlag je Bild
   textCharsPerToken: number;
   promptOverheadTokens: number;
 }
@@ -99,16 +132,76 @@ export function costUsd(model: string, inputTokens: number, outputTokens: number
   return (Math.max(0, inputTokens) * p.inputUsdPerMTok + Math.max(0, outputTokens) * p.outputUsdPerMTok) / 1_000_000;
 }
 
-/** Obere Schätzung der Eingabe-Tokens einer Anfrage: pro Bild der Höchstwert, Text nach Zeichen. */
+/**
+ * Breite und Höhe eines JPEG aus dem Kopf der Datei (SOF-Marker), ohne das Bild zu dekodieren.
+ * null, wenn die Bytes kein lesbares JPEG sind. Die EXIF-Drehung spielt keine Rolle, die Kachelzahl bleibt gleich.
+ */
+export function jpegSize(bytes: Uint8Array): { width: number; height: number } | null {
+  if (bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) return null;
+  let i = 2;
+  while (i + 3 < bytes.length) {
+    if (bytes[i] !== 0xff) return null;
+    let marker = bytes[i + 1];
+    while (marker === 0xff && i + 2 < bytes.length) {
+      i++; // Füllbytes
+      marker = bytes[i + 1];
+    }
+    i += 2;
+    if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) continue; // ohne Länge
+    if (marker === 0xd9 || marker === 0xda) return null; // Ende oder Bilddaten vor dem Kopf
+    if (i + 1 >= bytes.length) return null;
+    const length = (bytes[i] << 8) | bytes[i + 1];
+    if (length < 2) return null;
+    const isSof = marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc;
+    if (isSof) {
+      if (i + 6 >= bytes.length || length < 7) return null;
+      const height = (bytes[i + 3] << 8) | bytes[i + 4];
+      const width = (bytes[i + 5] << 8) | bytes[i + 6];
+      return width > 0 && height > 0 ? { width, height } : null;
+    }
+    i += length;
+  }
+  return null;
+}
+
+/**
+ * Obergrenze der Eingabe-Tokens eines Bildes. Laut Anthropic kostet ein Bild ⌈Breite/28⌉ × ⌈Höhe/28⌉ Token; größere Bilder
+ * verkleinert Claude vorher, das kostet nie mehr als das Original und nie mehr als der Höchstwert des Modells (maxImageTokens).
+ * Ohne lesbare Maße gilt der Höchstwert. Dazu ein kleiner Zuschlag je Bild.
+ */
+export function imageTokenBound(size: { width: number; height: number } | null, p: Pick<AiPricing, 'maxImageTokens' | 'imagePatchPx' | 'imageTokenMargin'>): number {
+  if (!size || !(size.width > 0) || !(size.height > 0)) return p.maxImageTokens;
+  const patches = Math.ceil(size.width / p.imagePatchPx) * Math.ceil(size.height / p.imagePatchPx);
+  return Math.min(patches + p.imageTokenMargin, p.maxImageTokens);
+}
+
+/** Obere Schätzung der Eingabe-Tokens einer Anfrage: Bilder nach ihren Maßen (sonst Höchstwert), Text nach Zeichen. */
 export function estimateInputTokens(pages: readonly WorksheetPage[], p: Pick<AiPricing, 'maxImageTokens' | 'textCharsPerToken' | 'promptOverheadTokens'>): number {
   let tokens = p.promptOverheadTokens;
-  for (const page of pages) tokens += page.type === 'image' ? p.maxImageTokens : Math.ceil(page.text.length / p.textCharsPerToken);
+  for (const page of pages) {
+    if (page.type === 'image') {
+      // Nur eine gültige, gemessene Zahl ersetzt den Höchstwert, und nie nach oben über ihn hinaus
+      const measured = page.tokens;
+      tokens += typeof measured === 'number' && Number.isFinite(measured) && measured > 0 ? Math.min(Math.ceil(measured), p.maxImageTokens) : p.maxImageTokens;
+    } else {
+      tokens += Math.ceil(page.text.length / p.textCharsPerToken);
+    }
+  }
   return tokens;
+}
+
+/** Preis einer einzelnen Anfrage: bei langer Eingabe gilt der höhere Preis des Modells, falls es einen hat. */
+export function requestCostUsd(model: string, inputTokens: number, outputTokens: number, prices: Record<string, ModelPrice>): number {
+  const p = priceOf(model, prices);
+  const long = p.longAboveInputTokens !== undefined && inputTokens > p.longAboveInputTokens;
+  const inRate = long ? p.longInputUsdPerMTok ?? p.inputUsdPerMTok : p.inputUsdPerMTok;
+  const outRate = long ? p.longOutputUsdPerMTok ?? p.outputUsdPerMTok : p.outputUsdPerMTok;
+  return (Math.max(0, inputTokens) * inRate + Math.max(0, outputTokens) * outRate) / 1_000_000;
 }
 
 /** Teuerster möglicher Preis dieser Anfrage mit diesem Modell: geschätzte Eingabe plus die volle erlaubte Ausgabe. */
 export function worstCaseUsd(pages: readonly WorksheetPage[], model: string, p: AiPricing): number {
-  return costUsd(model, estimateInputTokens(pages, p), p.maxTokens, p.prices);
+  return requestCostUsd(model, estimateInputTokens(pages, p), p.maxTokens, p.prices);
 }
 
 /** Darf die nächste Anfrage noch gestellt werden, ohne dass das Monatsbudget überschritten werden könnte? */

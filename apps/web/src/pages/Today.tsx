@@ -3,6 +3,7 @@ import { Check, ChevronRight, Play, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ConcentrationCard } from '../components/ConcentrationCard';
+import { AbsencesCard } from '../components/AbsencesCard';
 import { SchoolDay } from '../components/SchoolDay';
 import { CardsDueCard } from '../components/today/CardsDueCard';
 import { NextUpCard } from '../components/today/NextUpCard';
@@ -163,6 +164,8 @@ export function Today() {
       </div>
 
       <SchoolDay />
+
+      <AbsencesCard />
 
       <PushNudge />
 

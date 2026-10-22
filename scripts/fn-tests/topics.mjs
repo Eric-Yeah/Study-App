@@ -48,6 +48,7 @@ globalThis.__cc = (_url, key, opts) => {
 const env = { ANTHROPIC_API_KEY: 'sk-test', SUPABASE_URL: 'https://x.supabase.co', SUPABASE_ANON_KEY: 'anon', SUPABASE_SERVICE_ROLE_KEY: 'service' };
 let handler; globalThis.Deno = { env: { get: (k) => env[k] }, serve: (h) => { handler = h; } };
 await import(process.env.FN_COPY);
+const { TOPICS_SCHEMA } = await import(new URL('../_shared/topics.ts', 'file://' + process.env.FN_COPY));
 
 const calls = []; let script = [];
 const reply = (text, { stop = 'end_turn', usage = { input_tokens: 900, output_tokens: 200 } } = {}) => ({ status: 200, body: { content: [{ type: 'text', text }], stop_reason: stop, usage } });
@@ -67,7 +68,7 @@ let st, b;
 reset([reply(topicsJson())]); [st, b] = await call(body);
 assert.equal(st, 200);
 const req = calls[0].body;
-assert.equal(req.model, HAIKU); assert.equal(req.max_tokens, 1500); assert.deepEqual(req.output_config, { effort: 'medium' });
+assert.equal(req.model, HAIKU); assert.equal(req.max_tokens, 1500); assert.deepEqual(req.output_config, { effort: 'medium', format: { type: 'json_schema', schema: TOPICS_SCHEMA } }); // strukturierte Ausgabe
 for (const k of ['thinking', 'temperature', 'top_p', 'top_k']) assert.ok(!(k in req), `kein ${k}`);
 assert.equal(calls[0].url, 'https://api.anthropic.com/v1/messages');
 assert.deepEqual(db.rpc.map((r) => [r.p_model, r.p_input, r.p_output]), [[HAIKU, 900, 200]]);

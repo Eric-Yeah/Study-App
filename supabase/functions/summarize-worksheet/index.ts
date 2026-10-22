@@ -8,7 +8,8 @@
 //   Monatskosten gerechnet. Passt das nicht mehr in CONFIG.ai.monthlyBudgetUsd, wird nichts an Claude geschickt.
 // - Zahlen (Tokens, Limits, Preise) stehen in CONFIG.ai (../_shared/config.ts, Kopie aus packages/core: npm run sync:shared).
 // - Modelle je Aufgabe aus CONFIG.ai.models: nur Text und Bild nehmen Haiku, bei Lesbarkeit "unsicher" und bei "Genauer lesen"
-//   Sonnet. Effort über output_config.effort. Kein thinking-Parameter (das Denken zählt zu max_tokens), und kein temperature,
+//   Sonnet. Effort über output_config.effort, die Antwort als JSON-Schema über output_config.format (strukturierte Ausgabe).
+//   Kein thinking-Parameter (das Denken zählt zu max_tokens), und kein temperature,
 //   top_p oder top_k. Der Verbrauch wird je Modell in ai_usage gezählt, die Kostengrenze rechnet mit dem Preis des Modells.
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
@@ -19,7 +20,11 @@ import {
   costUsd,
   escalationChoice,
   fitsBudget,
+  imageTokenBound,
+  jpegSize,
+  outputConfig,
   parseSummary,
+  SUMMARY_SCHEMA,
   shouldEscalate,
   spentUsd,
   summaryPrompt,
@@ -229,6 +234,8 @@ Deno.serve(async (req) => {
         if (error || !file) throw new Failure('not_found');
         const bytes = new Uint8Array(await file.arrayBuffer());
         if (bytes.byteLength > MAX_IMAGE_BYTES) throw new Failure('bad_request');
+        // Obergrenze der Bild-Tokens aus den echten Maßen, für die Kostengrenze (ohne lesbare Maße: Höchstwert)
+        page.tokens = imageTokenBound(jpegSize(bytes), CONFIG.ai);
         content.push({ type: 'text', text: `Seite ${n} (Bild):` });
         content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: toBase64(bytes) } });
       }
@@ -248,7 +255,8 @@ Deno.serve(async (req) => {
             max_tokens: CONFIG.ai.maxTokens,
             system: systemPrompt,
             messages: [{ role: 'user', content }],
-            output_config: { effort: choice.effort },
+            // Strukturierte Ausgabe: Claude antwortet sicher in der Form des Schemas, parseSummary bleibt als Sicherung
+            output_config: outputConfig(choice.effort, SUMMARY_SCHEMA),
           }),
         });
 

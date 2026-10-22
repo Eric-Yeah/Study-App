@@ -22,7 +22,7 @@ export function LanisAutoCard() {
       {auto.enabled ? (
         <>
           <p className="muted">
-            Stundenplan, Vertretungen und Klausuren werden beim Öffnen der App aktualisiert, wenn der Stand veraltet ist. Zuletzt: {ago(auto.lastAt)}.
+            Stundenplan, Vertretungen, Klausuren und Fehlstunden werden beim Öffnen der App aktualisiert, wenn der Stand veraltet ist. Zuletzt: {ago(auto.lastAt)}.
           </p>
           <p className="hint">Dein Passwort liegt verschlüsselt nur auf diesem Gerät, nie auf dem Server. Es geht nur bei einem Abruf an Lanis.</p>
           {auto.error && (

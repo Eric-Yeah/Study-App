@@ -153,7 +153,7 @@ export function SchoolDay() {
       {state.substitutionsAt && (
         <p className="hint">
           Vertretungsplan: Stand {subsAge}.{' '}
-          {auto.enabled ? (
+          {auto.enabled || auto.dsbEnabled ? (
             <>
               Aktualisiert sich automatisch.{' '}
               <button type="button" className="link-btn" disabled={auto.busy} onClick={() => void auto.refresh(true)}>

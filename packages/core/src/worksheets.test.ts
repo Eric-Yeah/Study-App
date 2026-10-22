@@ -2,6 +2,9 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { CONFIG } from './config';
 import { languageRule } from './languages';
+import { EXAM_RESULT_SCHEMA, LEARN_SCHEMA, parseExamResult, parseLearn } from './examGrading';
+import { parseStyle, STYLE_SCHEMA } from './taskStyle';
+import { parseTopics, TOPICS_SCHEMA } from './topics';
 import {
   chooseModel,
   chunkPages,
@@ -10,6 +13,11 @@ import {
   estimateInputTokens,
   fitsBudget,
   fitWithin,
+  imageTokenBound,
+  jpegSize,
+  outputConfig,
+  requestCostUsd,
+  SUMMARY_SCHEMA,
   mergeSummaries,
   needsOcr,
   normalizeForceEffort,
@@ -60,7 +68,10 @@ describe('Kosten und Monatsbudget', () => {
   const ai = CONFIG.ai;
   const HAIKU = 'claude-haiku-5-5';
   const SONNET = 'claude-sonnet-5-5';
-  const tenImages = Array.from({ length: ai.maxImagesPerRequest }, (_, i) => image(i));
+  const tenImages = Array.from({ length: ai.maxImagesPerRequest }, (_, i) => image(i)); // Maße unbekannt: Höchstwert
+  // So schickt die App Blätter: A4 mit 1600 px längster Kante, Tokens aus den Maßen gemessen
+  const a4Tokens = imageTokenBound({ width: 1131, height: 1600 }, ai);
+  const tenA4: WorksheetPage[] = Array.from({ length: ai.maxImagesPerRequest }, (_, i) => ({ type: 'image', path: `u/${i}.jpg`, tokens: a4Tokens }));
 
   it('rechnet Tokens in Dollar um, je Modell mit seinem Preis', () => {
     expect(costUsd(SONNET, 1_000_000, 0, ai.prices)).toBe(2);
@@ -109,11 +120,13 @@ describe('Kosten und Monatsbudget', () => {
     expect(estimateInputTokens(biggest, ai)).toBeLessThan(100_000);
   });
 
-  it('der schlimmste Fall einer Anfrage mit 10 Bildern: Sonnet unter 10 Cent, Haiku weit darunter', () => {
-    const sonnet = worstCaseUsd(tenImages, SONNET, ai);
+  it('der schlimmste Fall einer Anfrage mit 10 A4-Bildern: Sonnet unter 10 Cent, Haiku weit darunter', () => {
+    const sonnet = worstCaseUsd(tenA4, SONNET, ai);
     expect(sonnet).toBeGreaterThan(0.05);
     expect(sonnet).toBeLessThan(0.1);
-    const haiku = worstCaseUsd(tenImages, HAIKU, ai);
+    // Ohne lesbare Maße rechnet die Grenze mit dem Höchstwert und liegt darüber
+    expect(worstCaseUsd(tenImages, SONNET, ai)).toBeGreaterThan(sonnet);
+    const haiku = worstCaseUsd(tenA4, HAIKU, ai);
     expect(haiku).toBeLessThan(0.01);
     expect(haiku).toBeLessThan(sonnet / 10);
   });
@@ -133,8 +146,8 @@ describe('Kosten und Monatsbudget', () => {
   });
 
   it('auch im schlimmsten Fall bleibt der Monat unter dem Budget, mit jedem Modell', () => {
-    for (const [model, minRequests] of [[SONNET, 50], [HAIKU, 1000]] as const) {
-      const worst = worstCaseUsd(tenImages, model, ai);
+    for (const [pages, model, minRequests] of [[tenA4, SONNET, 50], [tenImages, SONNET, 40], [tenA4, HAIKU, 1000], [tenImages, HAIKU, 800]] as const) {
+      const worst = worstCaseUsd(pages, model, ai);
       let spent = 0;
       let n = 0;
       while (fitsBudget(spent, worst, ai.monthlyBudgetUsd) && n < 100_000) {
@@ -144,6 +157,130 @@ describe('Kosten und Monatsbudget', () => {
       expect(spent, model).toBeLessThanOrEqual(ai.monthlyBudgetUsd);
       expect(n, model).toBeGreaterThanOrEqual(minRequests);
     }
+  });
+});
+
+/** Kleinster JPEG-Kopf mit SOF0 (Baseline) oder SOF2 (progressiv), davor ein APP0-Block. */
+const jpegHeader = (width: number, height: number, sof = 0xc0): Uint8Array =>
+  new Uint8Array([
+    0xff, 0xd8, // Start
+    0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, // APP0 (JFIF)
+    0xff, sof, 0x00, 0x11, 0x08, height >> 8, height & 0xff, width >> 8, width & 0xff, 0x03, 0x01, 0x22, 0x00, 0x02, 0x11, 0x01, 0x03, 0x11, 0x01,
+    0xff, 0xd9,
+  ]);
+
+describe('Bild-Tokens als Obergrenze', () => {
+  const ai = CONFIG.ai;
+
+  it('jpegSize liest Breite und Höhe aus dem Kopf (Baseline und progressiv)', () => {
+    expect(jpegSize(jpegHeader(1131, 1600))).toEqual({ width: 1131, height: 1600 });
+    expect(jpegSize(jpegHeader(1600, 1200, 0xc2))).toEqual({ width: 1600, height: 1200 });
+    expect(jpegSize(jpegHeader(8000, 8000))).toEqual({ width: 8000, height: 8000 });
+  });
+
+  it('jpegSize: kein JPEG, abgeschnitten oder ohne Kopf ergibt null', () => {
+    expect(jpegSize(new Uint8Array([]))).toBeNull();
+    expect(jpegSize(new Uint8Array([0x89, 0x50, 0x4e, 0x47]))).toBeNull(); // PNG
+    expect(jpegSize(new Uint8Array([255, 216, 255, 1, 2, 3]))).toBeNull();
+    expect(jpegSize(jpegHeader(1131, 1600).slice(0, 25))).toBeNull();
+    expect(jpegSize(new Uint8Array([0xff, 0xd8, 0xff, 0xda, 0x00, 0x02]))).toBeNull(); // Bilddaten vor dem Kopf
+    expect(jpegSize(jpegHeader(0, 1600))).toBeNull();
+  });
+
+  it('Kacheln von 28 px wie in der Doku: ⌈B/28⌉ x ⌈H/28⌉ plus Zuschlag', () => {
+    expect(imageTokenBound({ width: 1131, height: 1600 }, ai)).toBe(41 * 58 + ai.imageTokenMargin);
+    expect(imageTokenBound({ width: 1600, height: 1200 }, ai)).toBe(58 * 43 + ai.imageTokenMargin);
+    expect(imageTokenBound({ width: 1000, height: 1000 }, ai)).toBe(1296 + ai.imageTokenMargin); // Beispiel der Doku: 1.296 Token
+    expect(imageTokenBound({ width: 200, height: 200 }, ai)).toBe(64 + ai.imageTokenMargin); // Beispiel der Doku: 64 Token
+  });
+
+  it('nie unter dem, was Claude berechnen kann: große Bilder und unbekannte Maße nehmen den Höchstwert des Modells', () => {
+    expect(ai.maxImageTokens).toBeGreaterThanOrEqual(4784); // Höchstwert bei hoher Auflösung laut Doku
+    expect(imageTokenBound({ width: 3840, height: 2160 }, ai)).toBe(ai.maxImageTokens);
+    expect(imageTokenBound({ width: 8000, height: 8000 }, ai)).toBe(ai.maxImageTokens);
+    expect(imageTokenBound(null, ai)).toBe(ai.maxImageTokens);
+    expect(imageTokenBound({ width: NaN, height: 100 }, ai)).toBe(ai.maxImageTokens);
+    // Für jede Größe: mindestens die Kachelzahl (begrenzt durch den Höchstwert der Doku)
+    for (let w = 1; w <= 3000; w += 97) {
+      for (let h = 1; h <= 3000; h += 89) {
+        const docTokens = Math.min(Math.ceil(w / 28) * Math.ceil(h / 28), 4784);
+        expect(imageTokenBound({ width: w, height: h }, ai)).toBeGreaterThanOrEqual(docTokens);
+      }
+    }
+  });
+
+  it('estimateInputTokens nimmt gemessene Tokens, ungültige Werte zählen mit dem Höchstwert, nie mehr als der Höchstwert', () => {
+    const base = ai.promptOverheadTokens;
+    expect(estimateInputTokens([{ type: 'image', path: 'u/1.jpg', tokens: 2394 }], ai)).toBe(base + 2394);
+    for (const bad of [0, -5, NaN, Infinity]) expect(estimateInputTokens([{ type: 'image', path: 'u/1.jpg', tokens: bad }], ai)).toBe(base + ai.maxImageTokens);
+    expect(estimateInputTokens([{ type: 'image', path: 'u/1.jpg', tokens: 99_999 }], ai)).toBe(base + ai.maxImageTokens);
+  });
+
+  it('Haiku über 100.000 Token Eingabe: der schlimmste Fall rechnet mit dem höheren Preis', () => {
+    const HAIKU = 'claude-haiku-5-5';
+    expect(requestCostUsd(HAIKU, 100_000, 1000, ai.prices)).toBeCloseTo((100_000 * 0.1 + 1000 * 0.5) / 1e6, 12);
+    expect(requestCostUsd(HAIKU, 100_001, 1000, ai.prices)).toBeCloseTo((100_001 * 0.5 + 1000 * 2.5) / 1e6, 12);
+    expect(requestCostUsd('claude-sonnet-5-5', 200_000, 0, ai.prices)).toBeCloseTo(0.4, 12);
+    const many: WorksheetPage[] = Array.from({ length: 24 }, (_, i) => ({ type: 'image', path: `u/${i}.jpg` }));
+    const pricing = { ...ai, maxTokens: 1000 };
+    expect(worstCaseUsd(many, HAIKU, pricing)).toBeCloseTo(requestCostUsd(HAIKU, estimateInputTokens(many, pricing), 1000, ai.prices), 12);
+    expect(worstCaseUsd(many, HAIKU, pricing)).toBeGreaterThan(costUsd(HAIKU, estimateInputTokens(many, pricing), 1000, ai.prices));
+  });
+});
+
+describe('strukturierte Ausgabe', () => {
+  it('outputConfig: Effort allein oder mit JSON-Schema im selben Objekt', () => {
+    expect(outputConfig('medium')).toEqual({ effort: 'medium' });
+    expect(outputConfig('high', SUMMARY_SCHEMA)).toEqual({ effort: 'high', format: { type: 'json_schema', schema: SUMMARY_SCHEMA } });
+  });
+
+  it('SUMMARY_SCHEMA: alle Felder Pflicht, keine weiteren, passt zu parseSummary', () => {
+    expect(SUMMARY_SCHEMA.additionalProperties).toBe(false);
+    expect([...SUMMARY_SCHEMA.required].sort()).toEqual(Object.keys(SUMMARY_SCHEMA.properties).sort());
+    const sample = { thema: 'Optik', kernaussagen: ['a'], begriffe: ['b'], formeln: [], offene_fragen: [], lesbarkeit: 'sicher' };
+    expect(Object.keys(parseSummary(JSON.stringify(sample))!).sort()).toEqual([...SUMMARY_SCHEMA.required].sort());
+    expect(SUMMARY_SCHEMA.properties.lesbarkeit.enum).toEqual(['sicher', 'unsicher']);
+  });
+
+  // Regeln der strukturierten Ausgabe (Anthropic-Doku): jedes Objekt mit additionalProperties: false, hier alle Felder Pflicht,
+  // keine Zahl- oder Längengrenzen (minimum, maxLength usw. werden nicht unterstützt), keine Rekursion.
+  const UNSUPPORTED = ['minimum', 'maximum', 'exclusiveMinimum', 'exclusiveMaximum', 'multipleOf', 'minLength', 'maxLength', 'minItems', 'maxItems', 'pattern', '$ref'];
+  const checkSchema = (node: unknown, path: string): void => {
+    if (typeof node !== 'object' || node === null) return;
+    const n = node as Record<string, unknown>;
+    for (const k of UNSUPPORTED) expect(k in n, `${path}: ${k}`).toBe(false);
+    if (n.type === 'object') {
+      expect(n.additionalProperties, path).toBe(false);
+      const props = Object.keys(n.properties as object);
+      expect([...(n.required as string[])].sort(), path).toEqual(props.sort());
+      for (const [k, v] of Object.entries(n.properties as object)) checkSchema(v, `${path}.${k}`);
+    }
+    if (n.items) checkSchema(n.items, `${path}[]`);
+    if (Array.isArray(n.anyOf)) n.anyOf.forEach((v, i) => checkSchema(v, `${path}|${i}`));
+  };
+
+  it('alle Schemas halten die Regeln ein', () => {
+    for (const [name, schema] of Object.entries({ SUMMARY_SCHEMA, EXAM_RESULT_SCHEMA, LEARN_SCHEMA, TOPICS_SCHEMA, STYLE_SCHEMA })) checkSchema(schema, name);
+  });
+
+  it('eine Antwort genau in der Form der Schemas lesen die bisherigen Parser (Sicherung bleibt gleich)', () => {
+    const exam = {
+      aufgaben: [{ nr: '1', titel: 'Analyse', operator: 'analysieren', afb: 2, max: 10, max_geschaetzt: false, punkte: 7.5, richtig: ['a'], fehlt: ['b'], tipp: 'c', unsicher: false }],
+      teile: { darstellung: 11, richtigkeit: null, ausdruck: null, uebersetzung_fehler: null, uebersetzung_woerter: null },
+      sprache: { fehler: 4, woerter: 600, anteil: 0.9 },
+      staerken: ['s'], schwaechen: ['w'], naechste_schritte: ['n'], lesbarkeit: 'sicher', erwartung_genutzt: false,
+    };
+    expect(Object.keys(exam).sort()).toEqual([...EXAM_RESULT_SCHEMA.required].sort());
+    const r = parseExamResult(JSON.stringify(exam))!;
+    expect(r.aufgaben[0].punkte).toBe(7.5);
+    expect(r.teile.darstellung).toBe(11);
+    expect(r.lesbarkeit).toBe('sicher');
+    const learn = parseLearn(JSON.stringify({ punkte_lehrkraft: 9, aufgaben_lehrkraft: [{ nr: '1', punkte: 6 }], lehren: ['x'] }), 5, 220)!;
+    expect(learn).toEqual({ teacherPoints: 9, tasks: [{ nr: '1', punkte: 6 }], lessons: ['x'] });
+    expect(parseTopics(JSON.stringify({ themen: [{ titel: 'Optik', quellen: [1] }] }), 2, [], 12, 80)).toEqual([{ title: 'Optik', sources: [1] }]);
+    const style = { zusammenfassung: 'z', aufbau: ['a'], formulierungen: [], operatoren: [], materialien: [], bewertung: [], besonderheiten: [] };
+    expect(Object.keys(style).sort()).toEqual([...STYLE_SCHEMA.required].sort());
+    expect(parseStyle(JSON.stringify(style), CONFIG.style)?.aufbau).toEqual(['a']);
   });
 });
 

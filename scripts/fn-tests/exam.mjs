@@ -71,6 +71,9 @@ globalThis.__cc = (_url, key, opts) => {
 const env = { ANTHROPIC_API_KEY: 'sk-test', SUPABASE_URL: 'https://x.supabase.co', SUPABASE_ANON_KEY: 'anon', SUPABASE_SERVICE_ROLE_KEY: 'service' };
 let handler; globalThis.Deno = { env: { get: (k) => env[k] }, serve: (h) => { handler = h; } };
 await import(process.env.FN_COPY);
+// Strukturierte Ausgabe: Effort und JSON-Schema des Modus stehen zusammen in output_config
+const { EXAM_RESULT_SCHEMA, LEARN_SCHEMA } = await import(new URL('../_shared/examGrading.ts', 'file://' + process.env.FN_COPY));
+const oc = (effort, schema = EXAM_RESULT_SCHEMA) => ({ effort, format: { type: 'json_schema', schema } });
 
 const calls = []; let script = [];
 const reply = (text, { stop = 'end_turn', usage = { input_tokens: 5000, output_tokens: 1500 } } = {}) => ({ status: 200, body: { content: [{ type: 'text', text }], stop_reason: stop, usage } });
@@ -94,7 +97,7 @@ let st, b;
 reset([reply(good())]); [st, b] = await call(grade);
 assert.equal(st, 200);
 const req = calls[0].body;
-assert.equal(req.model, SONNET); assert.equal(req.max_tokens, 8000); assert.deepEqual(req.output_config, { effort: 'medium' });
+assert.equal(req.model, SONNET); assert.equal(req.max_tokens, 8000); assert.deepEqual(req.output_config, oc('medium'));
 for (const k of ['thinking', 'temperature', 'top_p', 'top_k']) assert.ok(!(k in req), `kein ${k}`);
 assert.equal(b.main.model, SONNET); assert.equal(b.main.result.aufgaben[0].punkte, 14); assert.equal(b.compare, null);
 assert.deepEqual(db.rpc.map((r) => r.p_model), [SONNET]);
@@ -126,7 +129,7 @@ assert.equal(b.main.result.lesbarkeit, 'unsicher'); assert.equal(db.log[0].statu
 reset([reply(good()), reply(good({ aufgaben: [{ ...graded.aufgaben[0], punkte: 18 }] }), { usage: { input_tokens: 5000, output_tokens: 900 } })]);
 [st, b] = await call({ ...grade, compare: true });
 assert.equal(st, 200); assert.equal(calls.length, 2);
-assert.equal(calls[1].body.model, HAIKU); assert.deepEqual(calls[1].body.output_config, { effort: 'high' });
+assert.equal(calls[1].body.model, HAIKU); assert.deepEqual(calls[1].body.output_config, oc('high'));
 assert.equal(b.compare.model, HAIKU); assert.equal(b.compare.result.aufgaben[0].punkte, 18); assert.equal(b.main.result.aufgaben[0].punkte, 14);
 assert.equal(db.rows[HAIKU].requests, 1); assert.equal(db.rows[SONNET].requests, 1); assert.deepEqual(db.log.map((x) => x.model), [SONNET, HAIKU]);
 ok('Vergleich: dieselbe Klausur zusätzlich mit Haiku (high), Verbrauch und Protokoll je Modell');
@@ -146,7 +149,7 @@ assert.ok(calls[0].body.system.includes('Fehlergewichtung')); ok('Latein: Fehler
 reset(); [st, b] = await call({ mode: 'learn', reviewId: 'r1', pages: [img(P1, 'korrigiert')] });
 assert.equal(st, 409); assert.equal(b.error, 'not_graded'); assert.equal(calls.length, 0); ok('Lernen ohne KI-Korrektur: abgelehnt, nichts an Claude');
 reset([reply(learned, { usage: { input_tokens: 4000, output_tokens: 300 } })]); [st, b] = await call({ mode: 'learn', reviewId: 'r2', pages: [img(P1, 'korrigiert')] });
-assert.equal(st, 200); assert.deepEqual(b.learn, { teacherPoints: 8, tasks: [{ nr: '1', punkte: 11 }], lessons: ['Verlangt eine These in der Einleitung.'] });
+assert.equal(st, 200); assert.deepEqual(calls[0].body.output_config, oc('medium', LEARN_SCHEMA)); assert.deepEqual(b.learn, { teacherPoints: 8, tasks: [{ nr: '1', punkte: 11 }], lessons: ['Verlangt eine These in der Einleitung.'] });
 assert.equal(calls[0].body.max_tokens, 4000); assert.equal(calls[0].body.model, SONNET);
 assert.ok(calls[0].body.system.includes('höchstens 5 allgemeine Erfahrungen') && calls[0].body.system.includes('- Erwartet Zeilenangaben'));
 const first = texts(calls[0])[0];

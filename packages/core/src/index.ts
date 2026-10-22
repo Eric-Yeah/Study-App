@@ -29,5 +29,7 @@ export * from './abitur';
 export * from './taskStyle';
 export * from './pushPlan';
 export * from './access';
+export * from './absences';
+export * from './dsbPlan';
 export * from './grades';
 export * from './daily';

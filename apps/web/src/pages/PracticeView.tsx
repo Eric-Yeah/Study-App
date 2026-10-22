@@ -132,7 +132,7 @@ export function PracticeView() {
         </Link>
       </div>
 
-      <div className="grid cols-2">
+      <div className="grid cols-2 match">
         <section className="card stack" style={{ gap: 12 }}>
           <h2 className="section-head">Klausur</h2>
           <p className="hint">So sieht sie aus wie eine echte Klausur: Kopf mit Zeit und Hilfsmitteln, Material mit Zeilenzählung, Aufgaben mit BE und eine Punktetabelle.</p>

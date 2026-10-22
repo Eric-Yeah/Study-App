@@ -1,11 +1,11 @@
-import { CalendarDays, ClipboardCheck, GraduationCap, Home, NotebookPen, Settings as SettingsIcon, Timer, type LucideIcon } from 'lucide-react';
+import { CalendarDays, ClipboardCheck, GraduationCap, Home, ListChecks, NotebookPen, Settings as SettingsIcon, Timer, type LucideIcon } from 'lucide-react';
 
 /**
- * Aufbau der Navigation: sieben Bereiche, sechs davon in der unteren Leiste und der Seitenleiste, Einstellungen am Handy oben in der Kopfzeile.
+ * Aufbau der Navigation: acht Bereiche, sieben davon in der unteren Leiste und der Seitenleiste, Einstellungen am Handy oben in der Kopfzeile.
  * Jeder Bereich kann Reiter haben (SectionTabs). Welche Adresse zu welchem Bereich und Reiter gehört, steht nur hier.
  * Alte Adressen bleiben gültig: Eine Unterseite wie /korrektur/ID hält ihren Bereich in der Leiste aktiv.
  */
-export type AreaId = 'heute' | 'fokus' | 'plan' | 'notizen' | 'klausuren' | 'noten' | 'einstellungen';
+export type AreaId = 'heute' | 'fokus' | 'plan' | 'hausaufgaben' | 'notizen' | 'klausuren' | 'noten' | 'einstellungen';
 
 export type TabId =
   | 'plan'
@@ -14,6 +14,7 @@ export type TabId =
   | 'notizen'
   | 'karten'
   | 'hausaufgaben'
+  | 'arbeitsblaetter'
   | 'termine'
   | 'korrekturen'
   | 'uebung'
@@ -36,6 +37,8 @@ export interface NavArea {
   id: AreaId;
   to: string;
   label: string;
+  /** kürzere Beschriftung für die schmale untere Leiste am Handy */
+  short?: string;
   icon: LucideIcon;
   tabs?: NavTab[];
 }
@@ -55,6 +58,17 @@ export const AREAS: NavArea[] = [
     ],
   },
   {
+    id: 'hausaufgaben',
+    to: '/hausaufgaben',
+    label: 'Hausaufgaben',
+    short: 'Hausaufg.',
+    icon: ListChecks,
+    tabs: [
+      { id: 'hausaufgaben', to: '/hausaufgaben', label: 'Hausaufgaben' },
+      { id: 'arbeitsblaetter', to: '/arbeitsblaetter', label: 'Arbeitsblätter' },
+    ],
+  },
+  {
     id: 'notizen',
     to: '/notizen',
     label: 'Notizen',
@@ -62,7 +76,6 @@ export const AREAS: NavArea[] = [
     tabs: [
       { id: 'notizen', to: '/notizen', label: 'Notizen' },
       { id: 'karten', to: '/karten', label: 'Karteikarten' },
-      { id: 'hausaufgaben', to: '/hausaufgaben', label: 'Hausaufgaben' },
     ],
   },
   {
@@ -104,7 +117,8 @@ const RULES: { test: RegExp; area: AreaId; tab: TabId | null }[] = [
   { test: /^\/import(\/|$)/, area: 'plan', tab: 'lanis' },
   { test: /^\/notizen(\/|$)/, area: 'notizen', tab: 'notizen' },
   { test: /^\/karten(\/|$)/, area: 'notizen', tab: 'karten' },
-  { test: /^\/hausaufgaben(\/|$)/, area: 'notizen', tab: 'hausaufgaben' },
+  { test: /^\/hausaufgaben(\/|$)/, area: 'hausaufgaben', tab: 'hausaufgaben' },
+  { test: /^\/arbeitsblaetter(\/|$)/, area: 'hausaufgaben', tab: 'arbeitsblaetter' },
   { test: /^\/klausuren(\/|$)/, area: 'klausuren', tab: 'termine' },
   { test: /^\/klausur(\/|$)/, area: 'klausuren', tab: 'termine' },
   { test: /^\/korrektur\/(uebung|stil)(\/|$)/, area: 'klausuren', tab: 'uebung' },

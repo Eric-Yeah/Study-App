@@ -12,6 +12,14 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '2026.10.22.10',
+    date: '22. Oktober 2026',
+    items: [
+      { icon: '📚', title: 'Hausaufgaben: eigener Bereich', text: 'Hausaufgaben und Arbeitsblätter haben jetzt einen eigenen Bereich in der Leiste (Hausaufgaben, mit den Reitern Hausaufgaben und Arbeitsblätter). Die Hausaufgaben sind nach Abgabetag geordnet (Überfällig, Heute, Morgen, danach Tag für Tag) und zeigen bei jeder, wie viele Tage noch bleiben: „morgen fällig“, „in 3 Tagen fällig“ oder „seit 2 Tagen überfällig“. Oben stehen offen, überfällig und heute fällig auf einen Blick, die Farbe am Rand ist die des Fachs.' },
+      { icon: '🧩', title: 'Karten bündig', text: 'Karten, die nebeneinander stehen (zum Beispiel Lernzeit, Klausur und Karteikarten auf Heute), sind jetzt gleich hoch und schließen oben und unten bündig ab, auf Mac, iPad und Handy.' },
+    ],
+  },
+  {
     version: '2026.10.22.9',
     date: '22. Oktober 2026',
     items: [

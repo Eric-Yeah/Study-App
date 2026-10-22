@@ -64,6 +64,8 @@ ok('ungültige Zugangsdaten: 400, kein Aufruf');
 assert.equal(st, 200);
 assert.deepEqual(b.plans.map((p) => p.html), ['<div class="mon_title">22.10.2026 Donnerstag</div>', '<div class="mon_title">Frä Plan</div>']);
 assert.equal(b.updated, '2026-10-22T06:51:00');
+assert.deepEqual(b.menu.map((m) => [m.file, m.loaded]), [['subst_001.htm', true], ['subst_002.htm', true], ['subst_003.htm', false], ['plan.jpg', false], ['news.htm', false], ['subst_004.htm', false]]);
+assert.ok(b.menu.every((m) => !('url' in m)));
 assert.equal(dsb.requests[0].UserId, '123456');
 assert.ok(!JSON.stringify(b).includes('geheim'));
 ok('lädt die Pläne (UTF-8 und Latin-1), das Passwort steht nie in der Antwort');

@@ -33,6 +33,9 @@ export interface DsbInfo {
   at: number;
   diag: DsbDiagnosis;
   sample: string;
+  menu: { title: string; host: string; file: string; loaded: boolean }[];
+  /** Anfang jeder geladenen Seite (ohne Tags), damit man sieht, was darin steht */
+  heads: string[];
 }
 
 export function readDsbInfo(): DsbInfo | null {
@@ -234,7 +237,11 @@ export function LanisAutoProvider({ children }: { children: ReactNode }) {
         const pages = (data.plans ?? []).map((p) => p.html);
         try {
           const at = Date.now();
-          localStorage.setItem(DIAG_KEY, JSON.stringify({ at, diag: diagnoseDsb(pages, stateRef.current.timetable), sample: dsbSample(pages) } satisfies DsbInfo));
+          const heads = pages.map((h) => h.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 500));
+          localStorage.setItem(
+            DIAG_KEY,
+            JSON.stringify({ at, diag: diagnoseDsb(pages, stateRef.current.timetable), sample: dsbSample(pages), menu: data.menu ?? [], heads } satisfies DsbInfo),
+          );
           setDsbAt(at);
         } catch {
           // ignorieren

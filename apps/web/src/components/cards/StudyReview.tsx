@@ -127,7 +127,7 @@ export function StudyReview({
           ))}
         </div>
       )}
-      <p className="hint">Tastatur: Leertaste zeigt die Antwort, 1 bis 4 bewertet.</p>
+      <p className="hint kbd-hint">Tastatur: Leertaste zeigt die Antwort, 1 bis 4 bewertet.</p>
     </div>
   );
 }

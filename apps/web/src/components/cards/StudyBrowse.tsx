@@ -69,7 +69,7 @@ export function StudyBrowse({ cards, subjects, onClose }: { cards: Flashcard[]; 
           <ChevronRight size={18} aria-hidden="true" />
         </button>
       </div>
-      <p className="hint">Tastatur: Leertaste dreht um, Pfeiltasten blättern.</p>
+      <p className="hint kbd-hint">Tastatur: Leertaste dreht um, Pfeiltasten blättern.</p>
     </div>
   );
 }

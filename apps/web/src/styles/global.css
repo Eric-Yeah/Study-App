@@ -76,12 +76,11 @@ textarea {
   left: 0;
   right: 0;
   bottom: 0;
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  display: flex;
   background: var(--surface);
   border-top: 1px solid var(--line);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-  z-index: 10;
+  padding: 0 calc(4px + env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px) calc(4px + env(safe-area-inset-left, 0px));
+  z-index: 30;
 }
 .nav-link {
   display: flex;
@@ -96,25 +95,6 @@ textarea {
 .nav-link.active {
   color: var(--accent);
   font-weight: 600;
-}
-/* Sieben Bereiche in der unteren Leiste: kleinere Schrift, lange Namen gekürzt */
-.bottom-nav .nav-link {
-  font-size: 11px;
-  min-width: 0;
-}
-.nav-short {
-  display: none;
-}
-.bottom-nav .nav-full {
-  display: none;
-}
-.bottom-nav .nav-short {
-  display: inline;
-}
-@media (max-width: 360px) {
-  .bottom-nav .nav-link {
-    font-size: 9.5px;
-  }
 }
 @media (min-width: 900px) {
   .app {
@@ -623,18 +603,6 @@ a.card:hover {
   box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.05);
   backdrop-filter: blur(10px);
 }
-.bottom-nav .nav-link {
-  position: relative;
-}
-.bottom-nav .nav-link.active::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  width: 28px;
-  height: 3px;
-  border-radius: 0 0 4px 4px;
-  background: var(--accent);
-}
 .notice {
   border: 1px solid color-mix(in srgb, var(--warn) 25%, transparent);
 }
@@ -817,19 +785,8 @@ select.input.agenda-select {
   }
 }
 
-/* Handy: untere Leiste und Kopfzeile */
+/* Handy: Seitenkopf */
 @media (max-width: 520px) {
-  .nav-link {
-    font-size: 11px;
-    min-width: 0;
-    padding: 10px 2px 12px;
-  }
-  .nav-link span {
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
   .page-head > .row {
     width: 100%;
   }
@@ -1031,32 +988,15 @@ select.input.agenda-select {
   }
 }
 
-/* Logo und Kopfzeile */
+/* Logo in der Seitenleiste */
 .sidebar .brand {
   display: flex;
   align-items: center;
   gap: 10px;
 }
-.sidebar .brand img,
-.topbar img {
+.sidebar .brand img {
   border-radius: 9px;
   box-shadow: var(--shadow);
-}
-.topbar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 0;
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 18px;
-  max-width: 1100px;
-  margin: 0 auto;
-}
-@media (min-width: 900px) {
-  .topbar {
-    display: none;
-  }
 }
 
 /* Nächste Tage als Karten */
@@ -1266,8 +1206,7 @@ select.input.agenda-select {
     background: var(--accent-soft);
     color: var(--accent-ink);
   }
-  .bottom-nav,
-  .topbar {
+  .bottom-nav {
     display: none;
   }
   .main {
@@ -1516,14 +1455,6 @@ label {
   gap: 6px;
 }
 
-@media (max-width: 420px) {
-  .bottom-nav .nav-link {
-    font-size: 10px;
-    letter-spacing: -0.02em;
-    padding-left: 0;
-    padding-right: 0;
-  }
-}
 
 /* Ladebildschirm. Die Markenfarben des Logos sind fest (wie die Bilddatei), alles andere kommt aus den Tokens. */
 .splash {
@@ -3393,21 +3324,7 @@ a.chip {
   }
 }
 
-/* Einstellungen: am Handy als Zahnrad in der Kopfzeile, sonst unten in der Seitenleiste */
-.topbar-settings {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  color: var(--ink-2);
-}
-.topbar-settings.active {
-  color: var(--accent-ink);
-  background: var(--accent-soft);
-}
+/* Einstellungen: am Handy unter „Mehr“, sonst unten in der Seitenleiste */
 .sidebar .nav-link.nav-settings {
   margin-top: auto;
 }
@@ -3827,4 +3744,285 @@ a.chip {
   flex: 1;
   min-width: 140px;
   overflow-wrap: anywhere;
+}
+
+/* ---------- Handy (unter 768 px): untere Leiste mit vier Bereichen und „Mehr“, Seitenkopf, Reiter ---------- */
+.bottom-nav {
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+.bottom-nav .nav-link {
+  /* gleich breit, aber nie schmaler als die Beschriftung: „Hausaufgaben“ bekommt, was es braucht, ohne Kürzung */
+  flex: 1 1 0;
+  min-width: max-content;
+  min-height: var(--nav-h);
+  justify-content: center;
+  gap: 3px;
+  padding: 7px 6px 8px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.2;
+  color: var(--ink-2);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.bottom-nav .nav-link.active {
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+.nav-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 30px;
+  border-radius: 999px;
+}
+.bottom-nav .nav-link.active .nav-icon {
+  background: var(--accent-soft);
+}
+.nav-label {
+  white-space: nowrap;
+}
+.bottom-nav .nav-link:focus-visible,
+.more-item:focus-visible {
+  outline-offset: -3px;
+  border-radius: var(--r-m);
+}
+@media (max-width: 359px) {
+  .bottom-nav {
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+  .bottom-nav .nav-link {
+    font-size: 11px;
+    padding-inline: 4px;
+  }
+  .nav-icon {
+    width: 46px;
+  }
+}
+
+/* „Mehr“: Liste über der Leiste, die Leiste bleibt sichtbar (nochmal „Mehr“ schließt) */
+.more-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  background: rgba(8, 12, 24, 0.45);
+  animation: more-fade 0.15s ease;
+}
+.more-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px));
+  z-index: 29;
+  max-height: calc(100vh - var(--nav-h) - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px) - 24px);
+  max-height: calc(100dvh - var(--nav-h) - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px) - 24px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 10px 12px 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-bottom: 0;
+  border-radius: var(--r-l) var(--r-l) 0 0;
+  box-shadow: var(--shadow-lift);
+  animation: more-up 0.18s ease;
+}
+@keyframes more-up {
+  from {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+}
+@keyframes more-fade {
+  from {
+    opacity: 0;
+  }
+}
+.more-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.more-list > li {
+  padding: 4px 0 8px;
+}
+.more-list > li + li {
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+.more-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 4px 6px;
+  border-radius: var(--r-m);
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 16px;
+  text-decoration: none;
+}
+.more-item.active {
+  color: var(--accent-ink);
+}
+.more-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border-radius: var(--r-m);
+  background: var(--surface-2);
+  color: var(--ink-2);
+}
+.more-item.active .more-icon {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+.more-label {
+  flex: 1;
+}
+.more-chevron {
+  color: var(--ink-3);
+}
+.more-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 2px 6px 0 56px;
+}
+.more-tab {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 6px 14px;
+  border: var(--bw) solid var(--line-strong);
+  border-radius: 999px;
+  color: var(--ink);
+  font-size: 14px;
+  text-decoration: none;
+}
+.more-tab[aria-current='page'] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+@media (pointer: coarse) {
+  .more-tab {
+    min-height: 44px;
+  }
+}
+@media (min-width: 768px) {
+  .more-backdrop,
+  .more-sheet {
+    display: none;
+  }
+}
+
+@media (max-width: 767px) {
+  /* Ohne Kopfzeile beginnt die Seite gleich mit dem Inhalt */
+  .main {
+    padding-top: 16px;
+  }
+  /* Reiter eines Bereichs: eine ruhige Segmentleiste statt einzelner Kästen, bei Platzmangel seitlich wischbar */
+  .subnav {
+    gap: 2px;
+    padding: 3px;
+    margin-bottom: 18px;
+    border-radius: var(--r-m);
+    background: var(--surface);
+    border: 1px solid var(--line);
+  }
+  .subnav a {
+    flex: 1 0 auto;
+    min-width: max-content;
+    padding: 7px 12px;
+    border: 0;
+    border-radius: var(--r-s);
+    background: transparent;
+    color: var(--ink-2);
+  }
+  .subnav a[aria-current='page'] {
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+  }
+  h1 {
+    font-size: 27px;
+  }
+  .page-head {
+    margin-bottom: 12px;
+  }
+  /* Der schwebende Knopf passt nicht überall zu den Bedienelementen unten (Timer) */
+  .fab-not-phone {
+    display: none;
+  }
+  .fab {
+    bottom: calc(var(--nav-h) + 14px + env(safe-area-inset-bottom, 0px));
+    right: calc(14px + env(safe-area-inset-right, 0px));
+  }
+  /* Rückblick: Woche davor und danach nebeneinander statt untereinander */
+  .review-nav .btn {
+    flex: 1 1 0;
+    min-width: 0;
+    gap: 4px;
+    padding-inline: 8px;
+    white-space: nowrap;
+  }
+  /* Beim Tippen in ein Feld (Tastatur offen) läge der Knopf über dem Formular */
+  body:has(.main input:not([type='checkbox']):not([type='radio']):not([type='range']):focus, .main textarea:focus, .main select:focus) .fab {
+    display: none;
+  }
+}
+
+/* Fokus: Fach und Länge in je einer Zeile; am Handy seitlich wischbar statt vier Zeilen hoch, damit Start ohne Scrollen sichtbar bleibt */
+.focus-card {
+  align-items: center;
+  gap: 20px;
+  min-width: 0; /* als Grid-Element nicht von der wischbaren Chip-Zeile auseinandergeschoben werden */
+}
+.focus-chips {
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+/* Tastenkürzel nur dort erwähnen, wo eine Tastatur wahrscheinlich ist (nicht am Handy) */
+@media (max-width: 767px) and (pointer: coarse) {
+  .kbd-hint {
+    display: none;
+  }
+}
+@media (max-width: 767px) {
+  .focus-card {
+    gap: 14px;
+  }
+  .focus-chips {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    align-self: stretch;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+    margin-inline: -18px;
+    padding: 2px 18px;
+  }
+  .focus-chips::-webkit-scrollbar {
+    display: none;
+  }
+  .focus-chips > * {
+    flex: none;
+  }
+  /* zentriert, solange alles passt; läuft die Zeile über, beginnt sie links */
+  .focus-chips > :first-child {
+    margin-left: auto;
+  }
+  .focus-chips > :last-child {
+    margin-right: auto;
+  }
 }

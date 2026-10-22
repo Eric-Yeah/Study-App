@@ -108,7 +108,7 @@ export function StudyChoice({ cards, pool, subjects, onClose }: { cards: Flashca
           Weiter
         </button>
       )}
-      <p className="hint">Tastatur: 1 bis 4 wählt, Leertaste geht weiter.</p>
+      <p className="hint kbd-hint">Tastatur: 1 bis 4 wählt, Leertaste geht weiter.</p>
     </div>
   );
 }

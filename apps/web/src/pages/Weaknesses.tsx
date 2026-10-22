@@ -1,5 +1,5 @@
 import { CONFIG, subjectOverview, weaknessReport, type BucketStat } from '@study/core';
-import { ArrowLeft, ChevronRight, Lightbulb, TrendingDown, TrendingUp } from 'lucide-react';
+import { ChevronRight, Lightbulb, TrendingDown, TrendingUp } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { formatNumber } from '../lib/format';
@@ -55,9 +55,6 @@ export function Weaknesses() {
           <h1>Schwächen</h1>
           <p className="sub">Wo dir in den korrigierten Klausuren Punkte fehlen, nach Operator und Anforderungsbereich. Gerechnet aus den gespeicherten Korrekturen, ohne KI und ohne Kosten.</p>
         </div>
-        <Link className="btn" to="/korrektur">
-          <ArrowLeft size={16} aria-hidden="true" /> Zurück
-        </Link>
       </div>
 
       <div className="row" style={{ gap: 8, flexWrap: 'wrap' }} role="group" aria-label="Art">

@@ -1,5 +1,5 @@
-import type { ReactNode } from 'react';
-import { HashRouter, Link, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom';
+import { useEffect, type ReactNode } from 'react';
+import { HashRouter, Link, Navigate, Outlet, Route, Routes, useLocation, useNavigationType } from 'react-router-dom';
 import { AuthProvider, useAuth } from './lib/auth';
 import { ExamEditor } from './pages/ExamEditor';
 import { ExamCorrect } from './pages/ExamCorrect';
@@ -16,6 +16,7 @@ import { Corrections, PracticeExams } from './components/exam/Corrections';
 import { SectionTabs } from './components/SectionTabs';
 import { QuickAdd } from './components/QuickAdd';
 import { TimerPill } from './components/TimerPill';
+import { PhoneNav } from './components/PhoneNav';
 import { MAIN_AREAS, SETTINGS_AREA, locate } from './nav';
 import { Grades } from './pages/Grades';
 import { StylePage } from './pages/StylePage';
@@ -43,13 +44,13 @@ import { TimerProvider } from './timer/TimerProvider';
 
 const LOGO = `${import.meta.env.BASE_URL}favicon.svg`;
 
-function NavItems({ withSettings = false }: { withSettings?: boolean }) {
+/** Seitenleiste auf iPad und Mac: alle Bereiche, Einstellungen unten. Am Handy gilt PhoneNav. */
+function SidebarItems() {
   const { pathname } = useLocation();
   const current = locate(pathname).area;
-  const items = withSettings ? [...MAIN_AREAS, SETTINGS_AREA] : MAIN_AREAS;
   return (
     <>
-      {items.map(({ id, to, label, short, icon: Icon }) => (
+      {[...MAIN_AREAS, SETTINGS_AREA].map(({ id, to, label, icon: Icon }) => (
         <Link
           key={id}
           to={to}
@@ -57,14 +58,7 @@ function NavItems({ withSettings = false }: { withSettings?: boolean }) {
           className={`nav-link${current === id ? ' active' : ''}${id === 'einstellungen' ? ' nav-settings' : ''}`}
         >
           <Icon size={20} aria-hidden="true" />
-          {short ? (
-            <span>
-              <span className="nav-full">{label}</span>
-              <span className="nav-short">{short}</span>
-            </span>
-          ) : (
-            <span>{label}</span>
-          )}
+          <span>{label}</span>
         </Link>
       ))}
     </>
@@ -72,34 +66,34 @@ function NavItems({ withSettings = false }: { withSettings?: boolean }) {
 }
 
 /** Seiten, auf denen der Knopf „Schnell hinzufügen“ schwebt (nicht dort, wo unten Bedienelemente liegen, zum Beispiel in Lernrunden). */
-const QUICK_ADD_ROUTES = ['/', '/fokus', '/plan', '/rueckblick', '/notizen', '/klausuren'];
+const QUICK_ADD_ROUTES = ['/', '/fokus', '/plan', '/rueckblick', '/hausaufgaben', '/notizen', '/klausuren'];
+/** Dort nur auf iPad und Mac: am Handy lägen Start und Überspringen des Timers unter dem Knopf. */
+const QUICK_ADD_NOT_ON_PHONE = ['/fokus'];
+
+/** Neue Seite beginnt oben (sonst landet man nach einem Tipp in der Leiste mitten in der Seite); Zurück lässt den Browser die Stelle wählen. */
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  const type = useNavigationType();
+  useEffect(() => {
+    if (type !== 'POP') window.scrollTo(0, 0);
+  }, [pathname, type]);
+  return null;
+}
 
 function Layout() {
   const { state, syncError } = useStore();
   const location = useLocation();
-  const inSettings = locate(location.pathname).area === 'einstellungen';
   if (!state.onboarded) return <Navigate to="/start" replace />;
   return (
     <div className="app">
+      <ScrollToTop />
       <nav className="sidebar" aria-label="Hauptnavigation">
         <div className="brand">
           <img src={LOGO} alt="" width={30} height={30} />
           Study App
         </div>
-        <NavItems withSettings />
+        <SidebarItems />
       </nav>
-      <header className="topbar">
-        <img src={LOGO} alt="" width={28} height={28} />
-        <span>Study App</span>
-        <Link
-          to={SETTINGS_AREA.to}
-          className={`topbar-settings${inSettings ? ' active' : ''}`}
-          aria-label="Einstellungen"
-          aria-current={inSettings ? 'page' : undefined}
-        >
-          <SETTINGS_AREA.icon size={22} aria-hidden="true" />
-        </Link>
-      </header>
       <UpdateManager />
       <PushSync />
       <ReleaseNotes />
@@ -115,10 +109,8 @@ function Layout() {
           <Outlet />
         </ErrorBoundary>
       </main>
-      {QUICK_ADD_ROUTES.includes(location.pathname) && <QuickAdd />}
-      <nav className="bottom-nav" aria-label="Hauptnavigation">
-        <NavItems />
-      </nav>
+      {QUICK_ADD_ROUTES.includes(location.pathname) && <QuickAdd notOnPhone={QUICK_ADD_NOT_ON_PHONE.includes(location.pathname)} />}
+      <PhoneNav />
     </div>
   );
 }

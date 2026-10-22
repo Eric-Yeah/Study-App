@@ -54,14 +54,14 @@ export function Focus() {
 
   return (
     <div className="grid cols-2 match">
-      <div className="card stack" style={{ alignItems: 'center', gap: 20 }}>
+      <div className="card stack focus-card">
         <div className="between" style={{ width: '100%' }}>
           <h1 style={{ fontSize: 24 }}>Fokus</h1>
           <span className="muted">
             Session {Math.max(1, round)} von {state.timer.sessionsUntilLongBreak}
           </span>
         </div>
-        <div className="row" style={{ flexWrap: 'wrap', justifyContent: 'center', gap: 8 }} role="group" aria-label="Fach">
+        <div className="row focus-chips" role="group" aria-label="Fach">
           {subjects.map((s) => (
             <button key={s.id} type="button" className="chip" aria-pressed={t.subjectId === s.id} onClick={() => timer.setSubject(s.id)}>
               <span className="dot" style={{ background: s.color }} />
@@ -70,7 +70,7 @@ export function Focus() {
           ))}
         </div>
         {canPick && (
-          <div className="row" style={{ flexWrap: 'wrap', justifyContent: 'center', gap: 8 }} role="group" aria-label="Länge dieser Runde">
+          <div className="row focus-chips" role="group" aria-label="Länge dieser Runde">
             {lengths.map((m) => (
               <button key={m} type="button" className="chip" aria-pressed={minutes === m} onClick={() => timer.setLength(m)}>
                 {m} min
@@ -101,7 +101,10 @@ export function Focus() {
             <SkipForward size={18} aria-hidden="true" />
           </button>
         </div>
-        <p className="hint">Leertaste: Start und Pause · {timer.synced ? 'Mit anderen Geräten verbunden' : 'Nur auf diesem Gerät'}</p>
+        <p className="hint">
+          <span className="kbd-hint">Leertaste: Start und Pause · </span>
+          {timer.synced ? 'Mit anderen Geräten verbunden' : 'Nur auf diesem Gerät'}
+        </p>
       </div>
 
       <div className="stack">

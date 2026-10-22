@@ -12,6 +12,14 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '2026.10.22.11',
+    date: '22. Oktober 2026',
+    items: [
+      { icon: '📱', title: 'Aufgeräumt am Handy', text: 'Die Leiste unten hat jetzt fünf Einträge mit vollen Namen und größeren Tippflächen: Heute, Fokus, Hausaufgaben, Notizen und Mehr. Unter „Mehr“ findest du Plan, Klausuren, Noten und die Einstellungen, mit direkten Sprüngen zu Rückblick, Lanis, Korrekturen, Übung, Abiturrechner und Fächern. Die Kopfzeile mit dem Zahnrad fällt weg, so beginnt jede Seite gleich mit dem Inhalt. Auf iPad und Mac bleibt die Seitenleiste wie gewohnt.' },
+      { icon: '⏱️', title: 'Fokus passt auf einen Blick', text: 'Fächer und Längen stehen am Handy in je einer wischbaren Zeile, der Start-Knopf ist ohne Scrollen sichtbar und der Plus-Knopf liegt dort nicht mehr über dem Timer. Beim Tippen in ein Feld verschwindet der Plus-Knopf, und jede neue Seite beginnt oben.' },
+    ],
+  },
+  {
     version: '2026.10.22.10',
     date: '22. Oktober 2026',
     items: [

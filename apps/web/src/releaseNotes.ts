@@ -12,6 +12,13 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '2026.10.22.3',
+    date: '22. Oktober 2026',
+    items: [
+      { icon: '🔔', title: 'Ton am Ende des Timers', text: 'Auf Wunsch erklingt ein kurzer Ton, wenn eine Fokus- oder Pausenphase abläuft. Er ist standardmäßig aus. Beim ersten Fokus-Start eines Tages fragt dich die App, ob er ertönen soll; in Einstellungen → Timer-Ton kannst du ihn jederzeit ein- und ausschalten und testen. Die Einstellung gilt für das jeweilige Gerät.' },
+    ],
+  },
+  {
     version: '2026.10.22.2',
     date: '22. Oktober 2026',
     items: [

@@ -52,6 +52,8 @@ export async function lanisErrorCode(error: unknown): Promise<string | null> {
 export interface DsbResponse {
   plans?: { title: string; html: string }[];
   updated?: string | null;
+  /** Was DSBmobile angeboten hat und was davon geladen wurde (zur Fehlersuche) */
+  menu?: { title: string; host: string; file: string; loaded: boolean }[];
 }
 
 export const DSB_ERRORS: Record<string, string> = {

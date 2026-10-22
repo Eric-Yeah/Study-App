@@ -76,7 +76,9 @@ function DsbResult() {
   const { diag: d } = info;
   const when = new Date(info.at).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
   const copy = async () => {
-    const text = `Spalten: ${d.headers.join(' | ')}\nKlassen: ${d.klassSamples.join(', ')}\nStufen im Stundenplan: ${d.levels.join(', ') || '–'}\n\n${info.sample}`;
+    const menu = (info.menu ?? []).map((m) => `${m.loaded ? '[geladen]' : '[nicht geladen]'} ${m.title} | ${m.host} | ${m.file}`).join('\n');
+    const heads = (info.heads ?? []).map((h, i) => `Seite ${i + 1}: ${h}`).join('\n');
+    const text = `Seiten: ${d.recognized} von ${d.pages} erkannt, ${d.total} Einträge, ${d.mine} für dich\nSpalten: ${d.headers.join(' | ')}\nKlassen: ${d.klassSamples.join(', ')}\nStufen im Stundenplan: ${d.levels.join(', ') || '–'}\n\nDSB-Menü (${(info.menu ?? []).length}):\n${menu}\n\n${heads}\n\n${info.sample}`;
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
@@ -95,6 +97,12 @@ function DsbResult() {
           : ''}
         .
       </p>
+      {(info.menu ?? []).length > 0 && (
+        <p className="hint">
+          DSBmobile bietet {info.menu.length} {info.menu.length === 1 ? 'Inhalt' : 'Inhalte'} an, {info.menu.filter((m) => m.loaded).length} davon geladen
+          {d.pages === 0 ? ' (keiner als Plan-Seite erkannt)' : ''}.
+        </p>
+      )}
       {d.total === 0 && d.pages > 0 && <p className="hint">Im Plan stehen keine Einträge, oder die App versteht den Aufbau nicht. Kopiere den Ausschnitt und schick ihn weiter.</p>}
       <button type="button" className="btn btn-ghost" onClick={() => void copy()}>
         {copied ? 'Kopiert' : 'Plan-Ausschnitt kopieren (für die Fehlersuche)'}

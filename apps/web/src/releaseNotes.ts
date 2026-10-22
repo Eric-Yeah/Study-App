@@ -12,6 +12,13 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '2026.10.22.6',
+    date: '22. Oktober 2026',
+    items: [
+      { icon: '🔎', title: 'DSBmobile: genauere Fehlersuche', text: 'Unter Einstellungen → Vertretungsplan (DSBmobile) zeigt die App jetzt auch, was DSBmobile angeboten hat und was davon geladen wurde. Der kopierte Ausschnitt enthält diese Liste und den Anfang jeder Seite.' },
+    ],
+  },
+  {
     version: '2026.10.22.5',
     date: '22. Oktober 2026',
     items: [

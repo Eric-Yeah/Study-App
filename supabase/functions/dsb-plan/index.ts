@@ -5,7 +5,7 @@
 //   höchstens 20 Abrufe je Konto in 10 Minuten (rate_hit), damit die Function nicht zum Durchprobieren von Passwörtern taugt.
 // - Die DSB-Zugangsdaten gelten nur für diese Anfrage: nicht gespeichert, nicht geloggt.
 // - Anfrage: { dsbUser, dsbPassword }
-// - Antwort: { plans: [{ title, html }], updated }  (HTML-Seiten der Pläne im Untis-Aufbau, die App liest sie selbst)
+// - Antwort: { plans: [{ title, html }], updated, menu: [{ title, host, file, loaded }] }  (HTML-Seiten der Pläne im Untis-Aufbau, die App liest sie selbst)
 //   Fehler: login_failed (401), dsb_unavailable (502), bad_request (400), not_allowed (403), rate_limited (429)
 //
 // Protokoll der inoffiziellen "Mobile API" (aus den Bibliotheken dsbapi/dsbuntis): POST app.dsbcontrol.de/JsonHandler.ashx/GetData
@@ -50,29 +50,39 @@ async function pipe(bytes: Uint8Array, stream: CompressionStream | Decompression
 
 const allowedHost = (host: string) => /(^|\.)dsbcontrol\.de$/i.test(host) || /(^|\.)heinekingmedia\.de$/i.test(host);
 
-/** Alle Knoten mit Detail-Adresse (https, erlaubter Server, .htm oder .html), in der Reihenfolge der Antwort. */
-export function collectPlans(node: unknown, out: { title: string; url: string }[] = [], depth = 0): { title: string; url: string }[] {
+interface MenuItem {
+  title: string;
+  url: string;
+  host: string;
+  file: string;
+  /** darf geladen werden: https, erlaubter Server, .htm oder .html, keine news-Seite */
+  ok: boolean;
+}
+
+/** Alle Knoten mit Detail-Adresse in der Reihenfolge der Antwort, mit der Angabe, ob die Seite geladen werden darf. */
+export function collectMenu(node: unknown, out: MenuItem[] = [], depth = 0): MenuItem[] {
   if (depth > 12 || node === null || typeof node !== 'object') return out;
   if (Array.isArray(node)) {
-    for (const n of node) collectPlans(n, out, depth + 1);
+    for (const n of node) collectMenu(n, out, depth + 1);
     return out;
   }
   const o = node as Record<string, unknown>;
   if (typeof o.Detail === 'string') {
     try {
       const u = new URL(o.Detail);
-      if (u.protocol === 'https:' && allowedHost(u.hostname) && /\.html?$/i.test(u.pathname) && !/news\.html?$/i.test(u.pathname)) {
-        if (!out.some((p) => p.url === u.toString())) out.push({ title: typeof o.Title === 'string' ? o.Title.slice(0, 80) : '', url: u.toString() });
+      const ok = u.protocol === 'https:' && allowedHost(u.hostname) && /\.html?$/i.test(u.pathname) && !/news\.html?$/i.test(u.pathname);
+      if (!out.some((p) => p.url === u.toString())) {
+        out.push({ title: typeof o.Title === 'string' ? o.Title.slice(0, 80) : '', url: u.toString(), host: u.hostname, file: u.pathname.split('/').pop() ?? '', ok });
       }
     } catch {
       /* keine gültige Adresse: überspringen */
     }
   }
-  for (const v of Object.values(o)) collectPlans(v, out, depth + 1);
+  for (const v of Object.values(o)) collectMenu(v, out, depth + 1);
   return out;
 }
 
-async function getMenu(user: string, password: string): Promise<{ plans: { title: string; url: string }[]; updated: string | null }> {
+async function getMenu(user: string, password: string): Promise<{ menu: MenuItem[]; updated: string | null }> {
   const now = new Date().toISOString();
   const params = {
     UserId: user,
@@ -108,8 +118,7 @@ async function getMenu(user: string, password: string): Promise<{ plans: { title
     throw new DsbError('dsb_unavailable');
   }
   if (data.Resultcode !== 0) throw new DsbError('login_failed');
-  const plans = collectPlans(data.ResultMenuItems).slice(0, MAX_PLANS);
-  return { plans, updated: typeof data.LastUpdate === 'string' ? data.LastUpdate : null };
+  return { menu: collectMenu(data.ResultMenuItems), updated: typeof data.LastUpdate === 'string' ? data.LastUpdate : null };
 }
 
 /** Lädt eine Plan-Seite. Zeichensatz aus dem Header, sonst UTF-8; bei kaputten Zeichen Windows-1252 (Untis exportiert oft so). */
@@ -160,11 +169,13 @@ Deno.serve(async (req) => {
   if (!/^[\p{L}\p{N}._@-]{1,64}$/u.test(user) || !password || password.length > 200) return json({ error: 'bad_request' }, 400);
 
   try {
-    const { plans, updated } = await getMenu(user, password);
+    const { menu, updated } = await getMenu(user, password);
+    const plans = menu.filter((m) => m.ok).slice(0, MAX_PLANS);
     const pages = await Promise.all(plans.map(async (p) => ({ title: p.title, html: await getPage(p.url) })));
     const ok = pages.filter((p): p is { title: string; html: string } => p.html !== null);
     if (plans.length > 0 && ok.length === 0) return json({ error: 'dsb_unavailable' }, 502);
-    return json({ plans: ok, updated });
+    // menu: was DSB angeboten hat (nur Titel, Server und Dateiname), damit man sieht, warum etwas nicht geladen wurde
+    return json({ plans: ok, updated, menu: menu.slice(0, 30).map((m) => ({ title: m.title, host: m.host, file: m.file, loaded: ok.some((p) => p.title === m.title) && m.ok })) });
   } catch (e) {
     if (e instanceof DsbError) return json({ error: e.code }, e.code === 'login_failed' ? 401 : 502);
     return json({ error: 'dsb_unavailable' }, 502);

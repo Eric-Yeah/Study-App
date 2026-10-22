@@ -108,10 +108,11 @@ describe('DSBmobile: Fehlersuche', () => {
 <tr><td><span><small>09:55 - 10:40</small></span><span> 3. </span></td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td><div class="stunde"><b>Q1M03</b> R1 <br /><small>Xyz</small></div></td><td>&nbsp;</td></tr></tbody></table>`,
   );
   it('zählt, was im Plan stand und warum etwas nicht passt', async () => {
-    const { diagnoseDsb, dsbSample } = await import('./dsbPlan');
+    const { dsbSample } = await import('./dsbPlan');
+    const { diagnoseDsb } = await import('./dsbCheck');
     const html = `<div class="mon_title">22.10.2026 Donnerstag</div><table class="mon_list"><tr><th>Klasse(n)</th><th>Stunde</th><th>Fach</th></tr>
 <tr><td>Q1</td><td>3</td><td>M</td></tr><tr><td>Q1</td><td>6</td><td>M</td></tr><tr><td>Q1</td><td>3</td><td>G</td></tr><tr><td>8b</td><td>3</td><td>M</td></tr></table>`;
-    const d = diagnoseDsb([html, '<p>fremd</p>'], tt, 2026);
+    const d = diagnoseDsb([html, '<p>fremd</p>'], tt, new Date(2026, 9, 22, 12));
     expect(d).toMatchObject({ pages: 2, recognized: 1, total: 4, levels: ['Q1'], ofLevel: 3, mine: 1, dropped: { klass: 1, lesson: 1, subject: 1 } });
     expect(d.headers).toEqual(['Klasse(n)', 'Stunde', 'Fach']);
     expect(dsbSample([html])).toContain('mon_list');

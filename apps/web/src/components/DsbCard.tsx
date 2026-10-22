@@ -1,5 +1,8 @@
 import { useState, type FormEvent } from 'react';
-import { readDsbInfo, useLanisAuto } from '../lib/lanisAuto';
+import { DSB_PROBLEM_LABELS, DSB_REJECT_LABELS } from '@study/core';
+import { readDsbInfo, readDsbMeta, useLanisAuto } from '../lib/lanisAuto';
+
+const when = (ms: number) => (ms ? new Date(ms).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '–');
 
 /** Einstellungen: Vertretungsplan aus DSBmobile. Die Zugangsdaten bleiben verschlüsselt nur auf diesem Gerät. */
 export function DsbCard() {
@@ -74,7 +77,10 @@ function DsbResult() {
   const [copied, setCopied] = useState(false);
   if (!info) return <p className="hint">Noch kein Abruf. Tippe auf „Jetzt aktualisieren“.</p>;
   const { diag: d } = info;
-  const when = new Date(info.at).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  const meta = readDsbMeta();
+  const rejected = Object.entries(d.rejected ?? {}).filter(([, n]) => n > 0) as [keyof typeof DSB_REJECT_LABELS, number][];
+  const problems = Object.entries(d.problems ?? {}).filter(([, n]) => n > 0) as [keyof typeof DSB_PROBLEM_LABELS, number][];
+  const stand = d.stand ? `${d.stand.slice(8, 10)}.${d.stand.slice(5, 7)}. ${d.stand.slice(11, 16)}` : null;
   const copy = async () => {
     const menu = (info.menu ?? []).map((m) => `${m.loaded ? '[geladen]' : '[nicht geladen]'} ${m.title} | ${m.host} | ${m.file}`).join('\n');
     const heads = (info.heads ?? []).map((h, i) => `Seite ${i + 1}: ${h}`).join('\n');
@@ -89,14 +95,31 @@ function DsbResult() {
   return (
     <div className="stack" style={{ gap: 6 }}>
       <p className="hint">
-        Letzter Abruf {when}: {d.recognized} von {d.pages} {d.pages === 1 ? 'Seite' : 'Seiten'} gelesen, {d.total} Einträge im Plan der Schule
+        Letzter Abruf {when(info.at)}: {d.recognized} von {d.pages} {d.pages === 1 ? 'Seite' : 'Seiten'} gelesen, {d.total} Einträge im Plan der Schule
         {d.dates.length > 0 ? ` (${d.dates.map((x) => x.slice(8) + '.' + x.slice(5, 7) + '.').join(', ')})` : ''}.{' '}
-        <strong>{d.mine} davon für dich</strong>
+        <strong>{d.mine} davon für dich</strong>{d.uncertain ? ` (${d.uncertain} unsicher)` : ''}
         {d.total > 0 && d.mine < d.total
           ? ` (nicht passend: ${d.dropped.klass} andere Klasse, ${d.dropped.lesson} keine Stunde von dir, ${d.dropped.subject} anderes Fach oder andere Lehrkraft)`
           : ''}
         .
       </p>
+      <p className="hint">
+        Zuletzt bei DSBmobile nachgesehen: {when(meta.checkAt)}. Neues bei DSBmobile erkannt: {when(meta.changedAt)}
+        {meta.published ? `, veröffentlicht ${meta.published}` : ''}
+        {stand ? `. Stand der Schule: ${stand}` : ''}. Die App sieht bei geöffneter App alle paar Minuten nach und lädt den Plan neu, sobald es etwas Neues gibt.
+      </p>
+      {(rejected.length > 0 || problems.length > 0) && (
+        <p className="hint">
+          Verworfen, weil unplausibel:{' '}
+          {[
+            ...problems.map(([k, n]) => `${n} ${n === 1 ? 'Seite' : 'Seiten'} (${DSB_PROBLEM_LABELS[k]})`),
+            ...rejected.map(([k, n]) => `${n} ${DSB_REJECT_LABELS[k]}`),
+          ].join(', ')}
+          .
+        </p>
+      )}
+      {info.stored === false && <p className="hint">Dieser Abruf wurde nicht übernommen, dein bisheriger Stand bleibt erhalten.</p>}
+      {info.partial && <p className="hint">Nicht alle Seiten des Plans waren ladbar.</p>}
       {(info.menu ?? []).length > 0 && (
         <p className="hint">
           DSBmobile bietet {info.menu.length} {info.menu.length === 1 ? 'Inhalt' : 'Inhalte'} an, {info.menu.filter((m) => m.loaded).length} davon geladen

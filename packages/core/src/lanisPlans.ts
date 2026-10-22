@@ -196,6 +196,8 @@ export interface SubstitutionEntry {
   teacher: string | null;
   note: string | null;
   group: string | null;
+  /** Nur nach Fach und Zeit zugeordnet, ohne dass Kurscode oder Lehrkraft es bestätigen: kann auch einen anderen Kurs betreffen */
+  uncertain?: boolean;
 }
 
 export type SubstitutionKind = 'cancelled' | 'substitute' | 'room' | 'other';
@@ -293,26 +295,33 @@ export function sameTeacher(a: string, b: string): boolean {
 
 /**
  * Gehört ein Eintrag im Vertretungsplan zu dieser eigenen Stunde (es zählt nur die Stunde selbst, nicht der Tag)?
- * Ja, wenn
- * - die Lerngruppe (Lanis) oder ein Kurscode im Plan gleich dem Kurscode der Stunde ist,
- * - die Lehrkraft des Plans (die alte) gleich der Lehrkraft der Stunde ist (zwei Kurse gleichzeitig bei einer Lehrkraft gibt es nicht), oder
- * - das Fach passt UND die Lehrkraft ist auf einer Seite unbekannt. Ein anderer Kurscode desselben Fachs ist ein anderer Kurs,
- *   da hilft nur dieselbe Lehrkraft.
- * Ohne Fach entscheidet die Lehrkraft, ohne beides die Zeit. Nur mit Lerngruppe (Lanis) und ohne Fach zählt allein die Lerngruppe.
+ * - 'sure': die Lerngruppe (Lanis) oder ein Kurscode im Plan ist gleich dem Kurscode der Stunde, oder die Lehrkraft des Plans
+ *   (die alte) ist gleich der Lehrkraft der Stunde (zwei Kurse gleichzeitig bei einer Lehrkraft gibt es nicht)
+ * - 'maybe': das Fach passt und die Lehrkraft ist auf einer Seite unbekannt, oder es steht weder Fach noch Lehrkraft im Eintrag.
+ *   Es könnte ein anderer Kurs derselben Stufe zur selben Zeit sein.
+ * - null: anderer Kurs. Ein anderer Kurscode desselben Fachs bei anderer Lehrkraft ist ein anderer Kurs; ohne Fach, aber mit anderer
+ *   Lehrkraft ebenfalls. Nur mit Lerngruppe (Lanis) und ohne Fach zählt allein die Lerngruppe.
  */
+export function lessonFit(
+  e: Pick<SubstitutionEntry, 'subject' | 'subjectOld' | 'teacher' | 'group'>,
+  lesson: Pick<TimetableLesson, 'course' | 'abbr' | 'teacher'>,
+): 'sure' | 'maybe' | null {
+  if (e.group !== null && compactCode(e.group) === compactCode(lesson.course)) return 'sure';
+  const names = [e.subject, e.subjectOld].filter((x): x is string => Boolean(x));
+  if (names.some((n) => isCourseCode(n) && compactCode(n) === compactCode(lesson.course))) return 'sure';
+  const teacherKnown = Boolean(e.teacher) && lesson.teacher !== '';
+  if (teacherKnown && sameTeacher(e.teacher as string, lesson.teacher)) return 'sure';
+  if (teacherKnown) return null;
+  if (names.length === 0) return e.group === null ? 'maybe' : null;
+  return names.some((n) => !isCourseCode(n) && subjectMatchesAbbr(n, lesson.abbr)) ? 'maybe' : null;
+}
+
+/** Passt der Eintrag zur Stunde (sicher oder vielleicht, siehe lessonFit)? */
 export function substitutionFitsLesson(
   e: Pick<SubstitutionEntry, 'subject' | 'subjectOld' | 'teacher' | 'group'>,
   lesson: Pick<TimetableLesson, 'course' | 'abbr' | 'teacher'>,
 ): boolean {
-  if (e.group !== null && compactCode(e.group) === compactCode(lesson.course)) return true;
-  const names = [e.subject, e.subjectOld].filter((x): x is string => Boolean(x));
-  if (names.some((n) => isCourseCode(n) && compactCode(n) === compactCode(lesson.course))) return true;
-  const teacherKnown = Boolean(e.teacher) && lesson.teacher !== '';
-  const teacherEqual = teacherKnown && sameTeacher(e.teacher as string, lesson.teacher);
-  if (teacherEqual) return true;
-  const teacherOk = !teacherKnown;
-  if (names.length === 0) return e.group === null && teacherOk;
-  return names.some((n) => !isCourseCode(n) && subjectMatchesAbbr(n, lesson.abbr)) && teacherOk;
+  return lessonFit(e, lesson) !== null;
 }
 
 export interface DayView {

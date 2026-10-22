@@ -4,8 +4,14 @@
 // - Läuft nur für angemeldete, freigegebene Konten (Verify JWT an und zusätzlich getUser, accounts.status = active),
 //   höchstens 20 Abrufe je Konto in 10 Minuten (rate_hit), damit die Function nicht zum Durchprobieren von Passwörtern taugt.
 // - Die DSB-Zugangsdaten gelten nur für diese Anfrage: nicht gespeichert, nicht geloggt.
-// - Anfrage: { dsbUser, dsbPassword }
-// - Antwort: { plans: [{ title, html }], updated, menu: [{ title, host, file, loaded }] }  (HTML-Seiten der Pläne im Untis-Aufbau, die App liest sie selbst)
+// - Anfrage: { dsbUser, dsbPassword, onlyMenu? }. Mit onlyMenu: true wird nur das Menü geholt (ein Aufruf bei DSBmobile, keine Seiten),
+//   das reicht für `version` und `published` und ist die leichte Prüfung, ob DSBmobile etwas Neues hat.
+// - Antwort: { plans: [{ title, html }], updated, menu: [{ title, host, file, loaded }], version, published, partial, failed }
+//   (HTML-Seiten der Pläne im Untis-Aufbau, die App liest sie selbst.) version ist ein Hash über Adresse (mit der Kennung des
+//   Ordners, die bei jeder Veröffentlichung neu ist) und Datum jeder Plan-Seite im Menü: gleich, solange DSBmobile nichts Neues
+//   veröffentlicht, anders bei jeder neuen Veröffentlichung. published ist das neueste Datum aus dem Menü ("22.10.2026 18:35").
+//   partial ist true, wenn nicht alle Plan-Seiten geladen werden konnten (failed = Zahl der fehlenden), die App speichert dann
+//   nicht über den alten Stand.
 //   Fehler: login_failed (401), dsb_unavailable (502), bad_request (400), not_allowed (403), rate_limited (429)
 //
 // Protokoll der inoffiziellen "Mobile API" (aus den Bibliotheken dsbapi/dsbuntis): POST app.dsbcontrol.de/JsonHandler.ashx/GetData
@@ -23,6 +29,7 @@ const CORS = {
 const DATA_URL = 'https://app.dsbcontrol.de/JsonHandler.ashx/GetData';
 const MAX_PLANS = 8;
 const MAX_PAGE_BYTES = 600_000;
+const MAX_TOTAL_BYTES = 2_500_000;
 const TIMEOUT_MS = 15_000;
 
 const json = (body: unknown, status = 200) =>
@@ -48,6 +55,13 @@ async function pipe(bytes: Uint8Array, stream: CompressionStream | Decompression
   return new Uint8Array(await out.arrayBuffer());
 }
 
+/** Kurze Kennung (SHA-256, 16 Zeichen) über die Plan-Seiten im Menü: Adresse und Datum, in fester Reihenfolge. */
+export async function menuVersion(items: { path: string; date: string }[]): Promise<string> {
+  const text = JSON.stringify(items.map((i) => [i.path, i.date]).sort((a, b) => (a.join('|') < b.join('|') ? -1 : 1)));
+  const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)));
+  return [...hash.subarray(0, 8)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
 const allowedHost = (host: string) => /(^|\.)(dsbcontrol|dsbmobile|heinekingmedia)\.de$/i.test(host);
 
 interface MenuItem {
@@ -55,6 +69,10 @@ interface MenuItem {
   url: string;
   host: string;
   file: string;
+  /** Datum der Veröffentlichung laut Menü ("22.10.2026 18:35") */
+  date: string;
+  /** Pfad der Seite, ohne Server */
+  path: string;
   /** darf geladen werden: https, erlaubter Server, .htm oder .html, keine news-Seite */
   ok: boolean;
 }
@@ -72,7 +90,7 @@ export function collectMenu(node: unknown, out: MenuItem[] = [], depth = 0): Men
       const u = new URL(o.Detail);
       const ok = u.protocol === 'https:' && allowedHost(u.hostname) && /\.html?$/i.test(u.pathname) && !/news\.html?$/i.test(u.pathname);
       if (!out.some((p) => p.url === u.toString())) {
-        out.push({ title: typeof o.Title === 'string' ? o.Title.slice(0, 80) : '', url: u.toString(), host: u.hostname, file: u.pathname.split('/').pop() ?? '', ok });
+        out.push({ title: typeof o.Title === 'string' ? o.Title.slice(0, 80) : '', url: u.toString(), host: u.hostname, file: u.pathname.split('/').pop() ?? '', date: typeof o.Date === 'string' ? o.Date.slice(0, 40) : '', path: u.pathname, ok });
       }
     } catch {
       /* keine gültige Adresse: überspringen */
@@ -158,7 +176,7 @@ Deno.serve(async (req) => {
   const { data: allowed } = await admin.rpc('rate_hit', { p_key: `dsb:${auth.user.id}`, p_max: 20, p_window_seconds: 600 });
   if (allowed !== true) return json({ error: 'rate_limited' }, 429);
 
-  let input: { dsbUser?: unknown; dsbPassword?: unknown };
+  let input: { dsbUser?: unknown; dsbPassword?: unknown; onlyMenu?: unknown };
   try {
     input = await req.json();
   } catch {
@@ -171,12 +189,30 @@ Deno.serve(async (req) => {
   try {
     const { menu, updated } = await getMenu(user, password);
     const plans = menu.filter((m) => m.ok).slice(0, MAX_PLANS);
+    const version = await menuVersion(plans);
+    const stamps = plans.map((p) => p.date).filter(Boolean);
+    // Das neueste Datum als Text zu vergleichen geht nicht ("22.10.2026 18:35"), darum in JJJJMMTTHHMM umgerechnet
+    const key = (d: string) => {
+      const m = /^(\d{1,2})\.(\d{1,2})\.(\d{4})\s+(\d{1,2}):(\d{2})/.exec(d);
+      return m ? `${m[3]}${m[2].padStart(2, '0')}${m[1].padStart(2, '0')}${m[4].padStart(2, '0')}${m[5]}` : '';
+    };
+    const published = stamps.sort((a, b) => (key(a) < key(b) ? -1 : 1)).at(-1) ?? null;
+    const menuOut = (loaded: Set<string>) => menu.slice(0, 30).map((m) => ({ title: m.title, host: m.host, file: m.file, loaded: loaded.has(m.url) }));
+    if (input.onlyMenu === true) return json({ plans: [], updated, menu: menuOut(new Set()), version, published, partial: false, failed: 0, onlyMenu: true });
+
+    let total = 0;
     const pages = await Promise.all(plans.map(async (p) => ({ title: p.title, url: p.url, html: await getPage(p.url) })));
-    const loaded = pages.filter((p): p is { title: string; url: string; html: string } => p.html !== null);
+    const loaded: { title: string; url: string; html: string }[] = [];
+    for (const p of pages) {
+      if (p.html === null) continue;
+      total += p.html.length;
+      if (total > MAX_TOTAL_BYTES) break; // Antwort begrenzen: der Rest zählt als nicht geladen
+      loaded.push({ title: p.title, url: p.url, html: p.html });
+    }
     const ok = loaded.map(({ title, html }) => ({ title, html }));
     if (plans.length > 0 && ok.length === 0) return json({ error: 'dsb_unavailable' }, 502);
     // menu: was DSB angeboten hat (nur Titel, Server und Dateiname), damit man sieht, warum etwas nicht geladen wurde
-    return json({ plans: ok, updated, menu: menu.slice(0, 30).map((m) => ({ title: m.title, host: m.host, file: m.file, loaded: loaded.some((p) => p.url === m.url) })) });
+    return json({ plans: ok, updated, menu: menuOut(new Set(loaded.map((p) => p.url))), version, published, partial: ok.length < plans.length, failed: plans.length - ok.length });
   } catch (e) {
     if (e instanceof DsbError) return json({ error: e.code }, e.code === 'login_failed' ? 401 : 502);
     return json({ error: 'dsb_unavailable' }, 502);

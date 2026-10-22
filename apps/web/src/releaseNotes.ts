@@ -12,6 +12,14 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '2026.10.22.8',
+    date: '22. Oktober 2026',
+    items: [
+      { icon: '🔄', title: 'Vertretungsplan lädt von selbst neu', text: 'Solange die App offen und sichtbar ist, sieht sie alle paar Minuten bei DSBmobile nach, ob die Schule etwas Neues veröffentlicht hat (das ist nur ein kleiner Abruf), und lädt den Plan dann sofort neu. Spätestens nach 3 Stunden wird immer neu geladen. Einstellungen → Vertretungsplan zeigt, wann zuletzt nachgesehen wurde und wann dort zuletzt etwas Neues erschien.' },
+      { icon: '🛡️', title: 'Vertretungsplan: lieber nichts als Falsches', text: 'Die App prüft den Plan jetzt auf Plausibilität: Datum und Wochentag, unmögliche Stunden, leere oder doppelte Zeilen und Widersprüche (Entfall und Vertretung desselben Kurses). Ist ein Abruf kaputt oder unvollständig, bleibt dein bisheriger Stand erhalten. Ist nur das Fach, aber nicht die Lehrkraft sicher, steht „unsicher“ daneben. Verworfenes zählt die Karte in den Einstellungen mit Grund. Heute zeigt den „Stand“ des Plans aus dem Plankopf der Schule.' },
+    ],
+  },
+  {
     version: '2026.10.22.7',
     date: '22. Oktober 2026',
     items: [

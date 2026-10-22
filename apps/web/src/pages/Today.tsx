@@ -97,7 +97,7 @@ export function Today() {
         </Link>
       )}
 
-      <div className="grid cols-2">
+      <div className="grid cols-2 match">
         <div className="card stack">
           <div className="between">
             <h2>Lernzeit heute</h2>

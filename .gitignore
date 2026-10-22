@@ -21,3 +21,8 @@ supabase/.temp
 
 # Kopien der Edge Functions für die Tests (scripts/fn-tests)
 supabase/functions/*/zz-test-copy.ts
+
+# graphify: lokaler Wissensgraph
+graphify-out/
+
+scripts/lanis-test/mu/

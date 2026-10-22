@@ -31,3 +31,65 @@ ok('Grenze je Konto (20 in 10 Minuten): 429, kein Aufruf ans Schulportal');
 ok('ungültige Schulnummer, Benutzername oder Passwort: 400');
 [st, b] = await call(body); assert.ok(state.fetches > 0); assert.ok(st >= 400); assert.ok(!JSON.stringify(b).includes('geheim'));
 ok('freigegebenes Konto erreicht das Schulportal, das Passwort steht nie in der Antwort');
+
+// --- Kursmappen (Hausaufgaben) und Anhänge: nachgebautes Schulportal ---
+const seen = [];
+const course = (id, name) => `<html><head><script>var geheim = 1;</script></head><body><div id="menu">Menü</div><h1 data-book="${id}"> ${name} <small>1. Halbjahr</small></h1>
+<button title="Muster, Max (Mus)"></button><div id="history"><div id="old"><table><tbody><tr data-entry="7"><td>01.10.2026<br/><small>1. Stunde</small></td><td><b>Thema</b><br/>
+<span class="homework"><span class="done hidden"></span><span class="undone "></span></span><br/><span class="markup">Aufgabe 1</span>
+<div class="file" data-extension="pdf" data-file="Blatt.pdf"><a href="#">Blatt.pdf <small>(1 KB)</small></a></div><encoded>GEHEIM==</encoded></td><td></td></tr></tbody></table></div></div><div id="marks">Noten</div></body></html>`;
+globalThis.fetch = async (url, init = {}) => {
+  const u = new URL(String(url));
+  seen.push(`${init.method ?? 'GET'} ${u.host}${u.pathname}${u.search}`);
+  if (u.host === 'login.schulportal.hessen.de') return new Response(null, { status: 302, headers: { location: 'https://connect.schulportal.hessen.de' } });
+  if (u.host === 'connect.schulportal.hessen.de') { const h = new Headers(); h.append('set-cookie', 'sid=abc123; path=/'); return new Response('ok', { status: 200, headers: h }); }
+  if (u.pathname === '/index.php') return new Response('bye');
+  if (u.pathname === '/meinunterricht.php' && !u.search) return new Response('<a href="meinunterricht.php?a=sus_view&id=6829">Bio</a> <a href="meinunterricht.php?a=sus_view&id=6829&halb=1">x</a> <a href="meinunterricht.php?a=sus_view&id=7316">Eng</a>');
+  if (u.pathname === '/meinunterricht.php' && u.searchParams.get('a') === 'sus_view') return u.searchParams.get('id') === '7316' ? new Response('kaputt', { status: 500 }) : new Response(course(u.searchParams.get('id'), 'Biologie GK 12 a'));
+  if (u.pathname === '/meinunterricht.php' && u.searchParams.get('a') === 'downloadFile') {
+    if (u.searchParams.get('f') === 'fehlt.pdf') return new Response('<html>Datei nicht gefunden</html>', { headers: { 'content-type': 'text/html; charset=utf-8' } });
+    return new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31]), { headers: { 'content-type': 'application/pdf' } });
+  }
+  return new Response('nope', { status: 404 });
+};
+const login = { ...body };
+
+[st, b] = await call({ ...login, parts: ['homework'] });
+assert.equal(st, 200);
+assert.deepEqual(b.errors, {});
+assert.deepEqual(b.courseHtml.map((c) => c.book), ['6829']);
+assert.match(b.courseHtml[0].html, /^<h1 data-book="6829"/);
+assert.ok(b.courseHtml[0].html.includes('Aufgabe 1') && b.courseHtml[0].html.includes('data-file="Blatt.pdf"'));
+assert.ok(!b.courseHtml[0].html.includes('geheim') && !b.courseHtml[0].html.includes('GEHEIM') && !b.courseHtml[0].html.includes('Noten') && !b.courseHtml[0].html.includes('Menü'));
+assert.equal(seen.filter((s) => s.includes('sus_view&id=6829')).length, 1, 'jede Kursmappe nur einmal laden');
+assert.ok(seen.some((s) => s.includes('/index.php?logout=all')), 'am Ende abmelden');
+ok('Kursmappen: nur Überschrift bis Historie, ohne Skripte und kodierte Teile, defekte Kurse fallen weg, Abmeldung');
+
+// Ältere Versionen der App fragen ohne parts: keine Kursmappen, keine Downloads
+seen.length = 0;
+[st, b] = await call(login);
+assert.equal(st, 200);
+assert.equal(b.courseHtml, undefined);
+assert.ok(!seen.some((s) => s.includes('meinunterricht.php?a=sus_view') || s.includes('downloadFile')));
+ok('ohne parts keine Kursmappen und keine Downloads');
+
+seen.length = 0;
+[st, b] = await call({ ...login, parts: ['download'], downloads: [{ book: '6829', entry: '7', name: 'Blatt & Co.pdf' }, { book: '6829', entry: '7', name: 'fehlt.pdf' }] });
+assert.equal(st, 200);
+assert.deepEqual(b.files.map((f) => [f.book, f.entry, f.name, f.type, f.size]), [['6829', '7', 'Blatt & Co.pdf', 'application/pdf', 6]]);
+assert.equal(Buffer.from(b.files[0].base64, 'base64').toString('latin1'), '%PDF-1');
+assert.deepEqual(b.failed.map((f) => [f.name, f.error]), [['fehlt.pdf', 'not_found']]);
+assert.deepEqual(b.errors, {});
+assert.ok(seen.some((s) => s === 'GET start.schulportal.hessen.de/meinunterricht.php?a=downloadFile&id=6829&e=7&f=Blatt%20%26%20Co.pdf'));
+ok('Download: nur die angeforderten Dateien, URL von der Function gebaut und kodiert, HTML-Antwort zählt als nicht gefunden');
+
+[st, b] = await call({ ...login, parts: ['download'], downloads: [{ book: '6829', entry: '7', name: 'fehlt.pdf' }] });
+assert.equal(st, 502); assert.equal(b.error, 'lanis_unavailable');
+ok('Download ohne eine einzige Datei: Fehler');
+
+seen.length = 0;
+for (const downloads of [undefined, [], 'x', [{ book: '../x', entry: '7', name: 'a.pdf' }], [{ book: '1', entry: '7?x=1', name: 'a.pdf' }], [{ book: '1', entry: '7', name: '../etc/passwd' }], [{ book: '1', entry: '7', name: 'a\\b.pdf' }], [{ book: '1', entry: '7', name: 'a\nb.pdf' }], [{ book: '1', entry: '7', name: 'x'.repeat(201) }], Array.from({ length: 13 }, () => ({ book: '1', entry: '2', name: 'a.pdf' }))]) {
+  [st, b] = await call({ ...login, parts: ['download'], downloads }); assert.equal(st, 400, JSON.stringify(downloads)?.slice(0, 60));
+}
+assert.equal(seen.length, 0, 'bei ungültigen Download-Anfragen kein Aufruf ans Schulportal');
+ok('ungültige Download-Anfragen (Pfade, Parameter, Steuerzeichen, zu viele): 400 ohne Aufruf ans Schulportal');

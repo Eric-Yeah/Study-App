@@ -10,6 +10,7 @@ import { RubricPage } from './pages/RubricPage';
 import { Weaknesses } from './pages/Weaknesses';
 import { Abitur } from './pages/Abitur';
 import { Cards } from './pages/Cards';
+import { Homework } from './pages/Homework';
 import { Exams } from './pages/Exams';
 import { Corrections, PracticeExams } from './components/exam/Corrections';
 import { SectionTabs } from './components/SectionTabs';
@@ -149,6 +150,7 @@ export function App() {
               <Route path="plan" element={<Plan />} />
               <Route path="notizen" element={<Notes />} />
               <Route path="karten" element={<Cards />} />
+              <Route path="hausaufgaben" element={<Homework />} />
               <Route path="klausuren" element={<Exams />} />
               <Route path="rueckblick" element={<Review />} />
               <Route path="faecher" element={<Subjects />} />

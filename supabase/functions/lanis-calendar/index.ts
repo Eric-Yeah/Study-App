@@ -3,12 +3,16 @@
 // - Läuft nur für angemeldete, freigegebene Konten (Verify JWT an und zusätzlich getUser, accounts.status = active), höchstens
 //   20 Abrufe je Konto in 10 Minuten (rate_hit), damit die Function nicht zum Durchprobieren von Schulportal-Passwörtern taugt.
 // - Das Schulportal-Passwort wird nur für diese Anfrage verwendet: nicht gespeichert, nicht geloggt.
-// - Anfrage: { schoolId, username, password, parts?: ['calendar', 'timetable', 'substitutions', 'absences'] }
-// - Antwort: { events, timetableHtml, substitutions, absencesHtml, errors }
+// - Anfrage: { schoolId, username, password, parts?: ['calendar', 'timetable', 'substitutions', 'absences', 'homework', 'download'], downloads? }
+//   Ohne parts gelten die vier ersten Teile (ältere Versionen der App kennen homework und download nicht).
+// - Antwort: { events, timetableHtml, substitutions, absencesHtml, courseHtml, files, errors }
 //   events: nur Klausur-Einträge mit Id, title, description, start, allDay
 //   timetableHtml: nur der Abschnitt "Persönlicher Stundenplan" (nicht der Gesamtplan der Stufe)
 //   substitutions: pro Tag die Rohliste von "Mein Vertretungsplan" ([{ date: 'dd.mm.yyyy', raw }])
 //   absencesHtml: nur die Anwesenheitstabelle (id="anwesend") von "Mein Unterricht" mit den Fehlstunden je Kurs
+//   courseHtml: pro Kursmappe von "Mein Unterricht" (sus_view) der Teil von der Überschrift bis zum Ende der Historie: [{ book, html }]
+//   files: Anhänge aus Kursmappen, die die App ausdrücklich angefordert hat (downloads: [{ book, entry, name }], höchstens 12, zusammen
+//          höchstens 20 MB): [{ book, entry, name, type, size, base64 }]. Die URL baut die Function selbst (nur meinunterricht.php?a=downloadFile)
 //   errors: pro Teil ein Fehlercode, wenn nur dieser Teil nicht gelesen werden konnte
 // Ablauf der Anmeldung nach SPHclient (MIT), mit sauber kodiertem Passwort.
 
@@ -146,6 +150,105 @@ async function getAbsencesHtml(schoolId: string, sid: string): Promise<string | 
   return html.slice(start, tableEnd + '</table>'.length).slice(0, 200_000);
 }
 
+const MAX_COURSES = 20;
+const MAX_COURSE_HTML = 250_000;
+const MAX_DOWNLOADS = 12;
+const MAX_FILE_BYTES = 15 * 1024 * 1024;
+const MAX_TOTAL_BYTES = 20 * 1024 * 1024;
+
+/** Kursmappen aus "Mein Unterricht": je Kurs der Teil der Seite mit Überschrift (data-book), Lehrkraft und Historie (Einträge). */
+async function getCourseHtml(schoolId: string, sid: string): Promise<{ book: string; html: string }[]> {
+  const headers = { 'user-agent': UA, cookie: sessionCookie(schoolId, sid) };
+  const overview = await (await fetch(`${BASE}/meinunterricht.php`, { headers })).text();
+  const ids = [...new Set([...overview.matchAll(/meinunterricht\.php\?a=sus_view&(?:amp;)?id=(\d{1,9})(?!\d)/g)].map((m) => m[1]))].slice(0, MAX_COURSES);
+  if (ids.length === 0) throw new LanisError('lanis_unavailable', 'Keine Kursmappen gefunden');
+  const out: { book: string; html: string }[] = [];
+  let next = 0;
+  // Vier Kursseiten gleichzeitig, mehr muss Lanis nicht aushalten
+  await Promise.all(
+    Array.from({ length: 4 }, async () => {
+      while (next < ids.length) {
+        const id = ids[next++];
+        try {
+          const page = await (await fetch(`${BASE}/meinunterricht.php?a=sus_view&id=${id}`, { headers })).text();
+          const start = page.search(/<h1\b[^>]*\bdata-book=/i);
+          if (start < 0) continue;
+          const history = page.search(/id=["']old["']/i);
+          const tableEnd = history < 0 ? -1 : page.indexOf('</table>', history);
+          const cut = page.slice(start, tableEnd < 0 ? start + MAX_COURSE_HTML : tableEnd + '</table>'.length);
+          const html = cut
+            .replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>|<encoded>[\s\S]*?<\/encoded>/gi, '')
+            .replace(/\s+/g, ' ')
+            .slice(0, MAX_COURSE_HTML);
+          out.push({ book: id, html });
+        } catch {
+          /* diese Kursmappe überspringen */
+        }
+      }
+    }),
+  );
+  if (out.length === 0) throw new LanisError('lanis_unavailable', 'Keine Kursmappe lesbar');
+  return out.sort((a, b) => Number(a.book) - Number(b.book));
+}
+
+interface DownloadWanted {
+  book: string;
+  entry: string;
+  name: string;
+}
+
+/** Nur Ziffern in Kurs und Eintrag, ein Dateiname ohne Steuerzeichen und Pfadtrenner. */
+function readDownloads(input: unknown): DownloadWanted[] | null {
+  if (!Array.isArray(input) || input.length === 0 || input.length > MAX_DOWNLOADS) return null;
+  const list: DownloadWanted[] = [];
+  for (const d of input as Record<string, unknown>[]) {
+    const book = String(d?.book ?? '');
+    const entry = String(d?.entry ?? '');
+    const name = String(d?.name ?? '');
+    // deno-lint-ignore no-control-regex
+    if (!/^\d{1,9}$/.test(book) || !/^\d{1,9}$/.test(entry) || name.length < 1 || name.length > 200 || /[\u0000-\u001f\\/]/.test(name)) return null;
+    list.push({ book, entry, name });
+  }
+  return list;
+}
+
+function toBase64(bytes: Uint8Array): string {
+  let s = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+
+/** Lädt Anhänge aus den Kursmappen. Die URL entsteht hier, nie aus Eingaben der App: immer meinunterricht.php?a=downloadFile auf dem Schulportal. */
+async function getFiles(schoolId: string, sid: string, wanted: DownloadWanted[]) {
+  const headers = { 'user-agent': UA, cookie: sessionCookie(schoolId, sid) };
+  const files: { book: string; entry: string; name: string; type: string; size: number; base64: string }[] = [];
+  const failed: { book: string; entry: string; name: string; error: string }[] = [];
+  let total = 0;
+  for (const w of wanted) {
+    const fail = (error: string) => failed.push({ ...w, error });
+    try {
+      const url = `${BASE}/meinunterricht.php?a=downloadFile&id=${w.book}&e=${w.entry}&f=${encodeURIComponent(w.name)}`;
+      const res = await fetch(url, { headers, redirect: 'manual' });
+      const type = (res.headers.get('content-type') ?? 'application/octet-stream').split(';')[0].trim().toLowerCase();
+      if (res.status !== 200 || type === 'text/html') {
+        await res.body?.cancel();
+        fail('not_found');
+        continue;
+      }
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      if (bytes.length > MAX_FILE_BYTES || total + bytes.length > MAX_TOTAL_BYTES) {
+        fail('too_large');
+        continue;
+      }
+      total += bytes.length;
+      files.push({ ...w, type, size: bytes.length, base64: toBase64(bytes) });
+    } catch {
+      fail('lanis_unavailable');
+    }
+  }
+  return { files, failed };
+}
+
 async function logout(cookies: string) {
   await fetch('https://start.schulportal.hessen.de/index.php?logout=all', {
     headers: { cookie: cookies, 'user-agent': UA },
@@ -171,7 +274,7 @@ Deno.serve(async (req) => {
   const { data: allowed } = await admin.rpc('rate_hit', { p_key: `lanis:${auth.user.id}`, p_max: 20, p_window_seconds: 600 });
   if (allowed !== true) return json({ error: 'rate_limited' }, 429);
 
-  let input: { schoolId?: unknown; username?: unknown; password?: unknown; days?: unknown; parts?: unknown };
+  let input: { schoolId?: unknown; username?: unknown; password?: unknown; days?: unknown; parts?: unknown; downloads?: unknown };
   try {
     input = await req.json();
   } catch {
@@ -181,8 +284,11 @@ Deno.serve(async (req) => {
   const username = String(input.username ?? '').trim();
   const password = String(input.password ?? '');
   const days = Math.min(400, Math.max(1, Number(input.days) || 200));
-  const ALL = ['calendar', 'timetable', 'substitutions', 'absences'];
-  const parts = Array.isArray(input.parts) ? ALL.filter((p) => (input.parts as unknown[]).includes(p)) : ALL;
+  const DEFAULT_PARTS = ['calendar', 'timetable', 'substitutions', 'absences'];
+  const ALL = [...DEFAULT_PARTS, 'homework', 'download'];
+  const parts = Array.isArray(input.parts) ? ALL.filter((p) => (input.parts as unknown[]).includes(p)) : DEFAULT_PARTS;
+  const downloads = parts.includes('download') ? readDownloads(input.downloads) : null;
+  if (parts.includes('download') && !downloads) return json({ error: 'bad_request' }, 400);
   // schoolId und username landen in URL und Formular: nur erwartete Zeichen zulassen.
   if (!/^\d{1,6}$/.test(schoolId) || !/^[\p{L}\p{N}._-]{1,64}$/u.test(username) || !password || password.length > 200) {
     return json({ error: 'bad_request' }, 400);
@@ -197,6 +303,9 @@ Deno.serve(async (req) => {
       timetableHtml?: string | null;
       substitutions?: { date: string; raw: unknown }[];
       absencesHtml?: string | null;
+      courseHtml?: { book: string; html: string }[];
+      files?: { book: string; entry: string; name: string; type: string; size: number; base64: string }[];
+      failed?: { book: string; entry: string; name: string; error: string }[];
       errors: Record<string, string>;
     } = { errors: {} };
     if (parts.includes('calendar')) {
@@ -232,6 +341,23 @@ Deno.serve(async (req) => {
         if (result.absencesHtml === null) result.errors.absences = 'not_found';
       } catch {
         result.errors.absences = 'lanis_unavailable';
+      }
+    }
+    if (parts.includes('homework')) {
+      try {
+        result.courseHtml = await getCourseHtml(schoolId, session.sid);
+      } catch {
+        result.errors.homework = 'lanis_unavailable';
+      }
+    }
+    if (downloads) {
+      try {
+        const got = await getFiles(schoolId, session.sid, downloads);
+        result.files = got.files;
+        result.failed = got.failed;
+        if (got.files.length === 0) result.errors.download = got.failed[0]?.error ?? 'lanis_unavailable';
+      } catch {
+        result.errors.download = 'lanis_unavailable';
       }
     }
     // Nur wenn gar nichts gelesen werden konnte, ist die Anfrage insgesamt fehlgeschlagen.

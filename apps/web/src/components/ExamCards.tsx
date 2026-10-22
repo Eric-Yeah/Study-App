@@ -25,7 +25,7 @@ export function ExamCards() {
           <p className="muted">Noch keine Klausur angelegt. Importiere sie aus Lanis oder lege sie von Hand an.</p>
         </div>
       )}
-      <div className="grid cols-2">
+      <div className="grid cols-2 match">
         {list.map((item) => {
           const learned = learnedForExam(state.sessions, item) / 60;
           const totalH = item.plan.totalHours.value;

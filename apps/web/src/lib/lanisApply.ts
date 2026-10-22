@@ -1,4 +1,7 @@
 import {
+  buildHomework,
+  diagnoseBooks,
+  planHomework,
   dsbForStudent,
   extractAbsenceTable,
   mergeSubstitutions,
@@ -10,6 +13,7 @@ import {
   toIsoDate,
   type AbsenceReport,
   type Exam,
+  type HomeworkSnapshot,
   type DsbRead,
   type ImportItem,
   type LanisEvent,
@@ -17,7 +21,7 @@ import {
   type SubstitutionEntry,
   type Timetable,
 } from '@study/core';
-import type { Action } from '../state/store';
+import type { Action, Task } from '../state/store';
 import { uid } from './format';
 
 export interface LanisResponse {
@@ -25,6 +29,11 @@ export interface LanisResponse {
   timetableHtml?: string | null;
   substitutions?: { date: string; raw: unknown }[];
   absencesHtml?: string | null;
+  /** Kursseiten aus "Mein Unterricht" (von der Überschrift bis zum Ende der Historie) */
+  courseHtml?: { book: string; html: string }[];
+  /** Angeforderte Anhänge (Inhalt als base64) und die, die nicht geladen werden konnten */
+  files?: { book: string; entry: string; name: string; type: string; size: number; base64: string }[];
+  failed?: { book: string; entry: string; name: string; error: string }[];
   errors?: Record<string, string>;
 }
 
@@ -135,10 +144,20 @@ export function buildExam(item: ImportItem, subjectId: string, subjects: Pick<Su
  */
 export function applyLanis(
   data: LanisResponse,
-  ctx: { subjects: Subject[]; exams: Exam[]; dispatch: (a: Action) => void },
-): { exams: number; timetable: boolean; substitutions: boolean; absences: boolean } {
+  ctx: {
+    subjects: Subject[];
+    exams: Exam[];
+    dispatch: (a: Action) => void;
+    /** für Hausaufgaben: Stand, Aufgaben, Stundenplan und Konto (die Aufgaben bekommen daraus feste Ids) */
+    homework?: HomeworkSnapshot | null;
+    tasks?: Task[];
+    timetable?: Timetable | null;
+    userId?: string;
+  },
+): { exams: number; timetable: boolean; substitutions: boolean; absences: boolean; homework: 'ok' | 'unrecognized' | 'none'; newTasks: number } {
   const at = new Date().toISOString();
   let timetable = false;
+  let freshTimetable: Timetable | null = null;
   let substitutions = false;
   let absences = false;
   let exams = 0;
@@ -146,6 +165,7 @@ export function applyLanis(
     const tt = parseTimetable(data.timetableHtml);
     if (tt.lessons.length > 0) {
       ctx.dispatch({ type: 'setTimetable', timetable: tt, at });
+      freshTimetable = tt;
       timetable = true;
     }
   }
@@ -158,6 +178,33 @@ export function applyLanis(
     ctx.dispatch({ type: 'setAbsences', absences: report, at });
     absences = true;
   }
+  let homework: 'ok' | 'unrecognized' | 'none' = 'none';
+  let newTasks = 0;
+  if (data.courseHtml) {
+    const pages = data.courseHtml.map((c) => c.html);
+    // Erkennt die App keine einzige Zeile, bleibt der alte Stand (und eine Meldung weist darauf hin)
+    if (diagnoseBooks(pages).entries === 0) homework = 'unrecognized';
+    else {
+      const today = toIsoDate(new Date());
+      const items = buildHomework(pages, today);
+      const plan = planHomework(items, {
+        imported: ctx.homework?.imported ?? [],
+        tasks: ctx.tasks ?? [],
+        subjects: ctx.subjects,
+        timetable: freshTimetable ?? ctx.timetable ?? null,
+        today,
+      });
+      ctx.dispatch({ type: 'setHomework', homework: { items, imported: plan.imported }, at });
+      for (const d of plan.add) {
+        // feste Id aus Konto und Hausaufgabe: zwei Geräte, die gleichzeitig abrufen, legen dieselbe Aufgabe an, nicht zwei
+        const id = ctx.userId ? `hw:${ctx.userId}:${d.externalId}` : uid();
+        ctx.dispatch({ type: 'addTask', task: { id, title: d.title, subjectId: d.subjectId, minutes: null, date: d.date, done: false, externalId: d.externalId } });
+      }
+      for (const id of plan.complete) ctx.dispatch({ type: 'toggleTask', id });
+      newTasks = plan.add.length;
+      homework = 'ok';
+    }
+  }
   if (data.events) {
     for (const item of planImport(data.events, ctx.subjects, ctx.exams, toIsoDate(new Date()))) {
       if (item.status === 'known' || !item.subjectId) continue;
@@ -165,5 +212,5 @@ export function applyLanis(
       exams++;
     }
   }
-  return { exams, timetable, substitutions, absences };
+  return { exams, timetable, substitutions, absences, homework, newTasks };
 }

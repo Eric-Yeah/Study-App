@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useStore } from '../state/store';
-import { CONFIG, diagnoseDsb, dsbNextStep, dsbSample, type DsbDiagnosis } from '@study/core';
+import { CONFIG, diagnoseDsb, dsbNextStep, dsbSample, importableType, type DownloadRequest, type DsbDiagnosis } from '@study/core';
+import { useUserId } from './auth';
 import { applyDsbPlans, applyLanis, DSB_ERRORS, LANIS_ERRORS, lanisErrorCode, type DsbResponse, type LanisResponse } from './lanisApply';
 import { decryptText, encryptText } from './secureStore';
 import { supabase } from './supabase';
@@ -19,7 +20,7 @@ const DSB_KEY = 'study-app-dsb-creds';
 const DIAG_KEY = 'study-app-dsb-diag';
 const META_KEY = 'study-app-lanis-meta';
 const HOUR = 3_600_000;
-const MAX_AGE = { substitutions: 3 * HOUR, timetable: 24 * HOUR, calendar: 12 * HOUR, absences: 12 * HOUR };
+const MAX_AGE = { substitutions: 3 * HOUR, timetable: 24 * HOUR, calendar: 12 * HOUR, absences: 12 * HOUR, homework: CONFIG.homework.maxAgeHours * HOUR };
 const MIN_TRY_GAP = 20 * 60_000;
 
 export interface LanisCreds {
@@ -134,12 +135,22 @@ interface LanisAutoApi {
   enable: (creds: LanisCreds) => Promise<void>;
   disable: (reason?: string) => void;
   refresh: (force?: boolean) => Promise<void>;
+  /** Lädt Anhänge aus den Kursmappen in Lanis (ein Abruf, mehrere Dateien). Wirft einen Fehler mit deutscher Meldung. */
+  downloadFiles: (requests: DownloadRequest[]) => Promise<{ downloaded: { request: DownloadRequest; file: File }[]; failed: DownloadRequest[] }>;
+}
+
+function base64ToBytes(b64: string): Uint8Array<ArrayBuffer> {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(new ArrayBuffer(bin.length));
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
 }
 
 const Ctx = createContext<LanisAutoApi | null>(null);
 
 export function LanisAutoProvider({ children }: { children: ReactNode }) {
   const { state, dispatch } = useStore();
+  const userId = useUserId();
   const stateRef = useRef(state);
   stateRef.current = state;
   const [enabled, setEnabled] = useState(hasCreds);
@@ -209,6 +220,7 @@ export function LanisAutoProvider({ children }: { children: ReactNode }) {
       if (force || age(s.timetableAt) > MAX_AGE.timetable) parts.push('timetable');
       if (force || now - meta.calAt > MAX_AGE.calendar) parts.push('calendar');
       if (force || now - meta.absAt > MAX_AGE.absences) parts.push('absences');
+      if (force || age(s.homeworkAt) > MAX_AGE.homework) parts.push('homework');
       if (parts.length === 0 || (!force && now - meta.tryAt < MIN_TRY_GAP)) return;
 
       writeMeta({ ...meta, tryAt: now });
@@ -224,17 +236,52 @@ export function LanisAutoProvider({ children }: { children: ReactNode }) {
           return;
         }
         const latest = stateRef.current;
-        applyLanis(data, { subjects: latest.subjects, exams: latest.exams, dispatch });
+        const applied = applyLanis(data, { subjects: latest.subjects, exams: latest.exams, dispatch, homework: latest.homework, tasks: latest.tasks, timetable: latest.timetable, userId });
         const done = Date.now();
         const m = readMeta();
         writeMeta({ ...m, at: done, calAt: parts.includes('calendar') ? done : m.calAt, absAt: parts.includes('absences') ? done : m.absAt, tryAt: done });
         setLastAt(done);
-        setError(null);
+        setError(
+          applied.homework === 'unrecognized'
+            ? 'Die Hausaufgaben konnte die App nicht lesen: Lanis hat den Aufbau der Kursseiten wohl geändert. Der alte Stand bleibt erhalten.'
+            : data.errors?.homework
+              ? 'Die Kursmappen (Hausaufgaben) konnten gerade nicht geladen werden.'
+              : null,
+        );
       } catch {
         setError('Aktualisierung aus Lanis gerade nicht möglich.');
       }
     },
-    [dispatch, disable],
+    [dispatch, disable, userId],
+  );
+
+  const downloadFiles = useCallback<LanisAutoApi['downloadFiles']>(
+    async (requests) => {
+      if (!hasCreds()) throw new Error('Dafür muss die automatische Aktualisierung aus Lanis an sein (Plan → Lanis, „Auf diesem Gerät merken“).');
+      const raw = await decryptText(localStorage.getItem(CREDS_KEY));
+      const creds = raw ? (JSON.parse(raw) as LanisCreds) : null;
+      if (!creds) throw new Error('Die gespeicherten Zugangsdaten sind nicht mehr lesbar. Verbinde Lanis neu.');
+      const downloaded: { request: DownloadRequest; file: File }[] = [];
+      const failed: DownloadRequest[] = [];
+      for (let i = 0; i < requests.length; i += CONFIG.homework.maxDownloads) {
+        const chunk = requests.slice(i, i + CONFIG.homework.maxDownloads);
+        const { data, error: err } = await supabase.functions.invoke<LanisResponse>('lanis-calendar', { body: { ...creds, parts: ['download'], downloads: chunk } });
+        if (err || !data) {
+          const code = await lanisErrorCode(err);
+          if (code === 'login_failed') disable(`${LANIS_ERRORS.login_failed} Die Automatik ist ausgeschaltet, damit dein Konto nicht gesperrt wird.`);
+          throw new Error(code ? LANIS_ERRORS[code] ?? 'Download aus Lanis gerade nicht möglich.' : 'Download aus Lanis gerade nicht möglich.');
+        }
+        for (const f of data.files ?? []) {
+          const request = chunk.find((r) => r.book === f.book && r.entry === f.entry && r.name === f.name);
+          if (!request) continue;
+          const type = importableType({ name: f.name, ext: '' }) ?? f.type;
+          downloaded.push({ request, file: new File([base64ToBytes(f.base64)], f.name, { type }) });
+        }
+        for (const f of chunk) if (!downloaded.some((d) => d.request === f)) failed.push(f);
+      }
+      return { downloaded, failed };
+    },
+    [disable],
   );
 
   const refreshDsb = useCallback(
@@ -371,8 +418,8 @@ export function LanisAutoProvider({ children }: { children: ReactNode }) {
   }, [enabled, dsbEnabled, refresh]);
 
   const value = useMemo(
-    () => ({ enabled, busy, error, lastAt, enable, disable, refresh, dsbEnabled, dsbError, enableDsb, disableDsb, dsbAt, dsbStand }),
-    [enabled, busy, error, lastAt, enable, disable, refresh, dsbEnabled, dsbError, dsbAt, dsbStand, enableDsb, disableDsb],
+    () => ({ enabled, busy, error, lastAt, enable, disable, refresh, downloadFiles, dsbEnabled, dsbError, enableDsb, disableDsb, dsbAt, dsbStand }),
+    [enabled, busy, error, lastAt, enable, disable, refresh, downloadFiles, dsbEnabled, dsbError, dsbAt, dsbStand, enableDsb, disableDsb],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

@@ -53,7 +53,7 @@ export function Focus() {
   }, [running, timer]);
 
   return (
-    <div className="grid cols-2">
+    <div className="grid cols-2 match">
       <div className="card stack" style={{ alignItems: 'center', gap: 20 }}>
         <div className="between" style={{ width: '100%' }}>
           <h1 style={{ fontSize: 24 }}>Fokus</h1>

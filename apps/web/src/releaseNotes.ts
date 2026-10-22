@@ -12,6 +12,14 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '2026.10.22.9',
+    date: '22. Oktober 2026',
+    items: [
+      { icon: '📚', title: 'Hausaufgaben aus Lanis', text: 'Die App liest jetzt deine Kursmappen in Lanis („Mein Unterricht“). Neue Hausaufgaben erscheinen als Aufgaben auf Heute, fällig zur nächsten Stunde des Fachs (aus deinem Stundenplan). Ist eine Hausaufgabe in Lanis als erledigt markiert, hakt die App die Aufgabe ab. Zurück nach Lanis schreibt sie nie. Alle Hausaufgaben und ihren Stand siehst du unter Notizen → Hausaufgaben. Voraussetzung: Lanis ist verbunden und „Auf diesem Gerät merken“ ist an.' },
+      { icon: '📎', title: 'Arbeitsblätter direkt aus Lanis', text: 'Unter Notizen → Hausaufgaben stehen auch die Anhänge deiner Lehrkräfte. „In Notizen übernehmen“ lädt die Datei direkt aus Lanis, wählt Fach, Datum und Lehrkraft vor und führt dich durch das gewohnte Hochladen (Seiten prüfen, bestätigen, auf Wunsch zusammenfassen). Mehrere PDFs eines Eintrags gehen in eine Notiz, schon übernommene sind markiert. Anderes, zum Beispiel PowerPoint, kannst du herunterladen.' },
+    ],
+  },
+  {
     version: '2026.10.22.8',
     date: '22. Oktober 2026',
     items: [

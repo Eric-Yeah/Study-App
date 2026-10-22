@@ -192,6 +192,13 @@ textarea {
   display: grid;
   gap: 16px;
 }
+/* Karten nebeneinander: gleich hoch, in einer Spalte mit mehreren Karten füllt die letzte den Rest (Kanten schließen bündig ab) */
+.grid.cols-2.match {
+  align-items: stretch;
+}
+.grid.match > .stack > .card:last-child {
+  flex: 1;
+}
 @media (min-width: 900px) {
   .grid.cols-2 {
     grid-template-columns: 1fr 1fr;

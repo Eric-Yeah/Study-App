@@ -1,4 +1,4 @@
-import { CONFIG, emptyPlan, type AbsenceReport, pendingAccess, type AccountAccess, type StyleRecord, type AbiturPlan, emptyGradeSettings, type GradeEntry, type GradeSettings, type ExamReview, type PracticeRecord, type SubjectRubric, type Flashcard, type Quarter, type Exam, type PlanSettings, type Role, type Stage, type Subject, type SubstitutionEntry, type Timetable, type Effort, type Legibility, type WorksheetSummary } from '@study/core';
+import { CONFIG, emptyPlan, type HomeworkSnapshot, type AbsenceReport, pendingAccess, type AccountAccess, type StyleRecord, type AbiturPlan, emptyGradeSettings, type GradeEntry, type GradeSettings, type ExamReview, type PracticeRecord, type SubjectRubric, type Flashcard, type Quarter, type Exam, type PlanSettings, type Role, type Stage, type Subject, type SubstitutionEntry, type Timetable, type Effort, type Legibility, type WorksheetSummary } from '@study/core';
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
 import { SplashScreen } from '../components/SplashScreen';
 import { loadRemote, persist, pickRemote, subscribeChanges, type RemoteData } from './remote';
@@ -40,6 +40,8 @@ export interface Task {
   minutes: number | null;
   date: string; // YYYY-MM-DD
   done: boolean;
+  /** Herkunft bei Aufgaben aus Lanis (Schlüssel `KURS:EINTRAG` der Hausaufgabe), damit nichts doppelt entsteht */
+  externalId?: string | null;
 }
 
 /** Tägliche Selbsteinschätzung für den Konzentrationsscore. null = nicht angegeben. */
@@ -99,6 +101,7 @@ export interface LessonNote {
   quarter: Quarter | null;
   pdfPath: string | null; // zusammengefügtes PDF im Speicher "documents"
   fileHashes: string[]; // SHA-256 der hochgeladenen Dateien, damit dieselbe Datei nicht zweimal bezahlt wird
+  lanisKeys: string[]; // Anhänge aus Lanis (`KURS:EINTRAG:Dateiname`), die in dieser Notiz stehen
   createdAt: string;
 }
 
@@ -125,6 +128,8 @@ export interface AppState {
   /** Fehlstunden aus Lanis (Mein Unterricht), null solange nie gelesen */
   absences: AbsenceReport | null;
   absencesAt: string | null;
+  homework: HomeworkSnapshot | null;
+  homeworkAt: string | null;
   notes: LessonNote[];
   cards: Flashcard[];
   examReviews: ExamReview[];
@@ -166,6 +171,8 @@ export const initialState: AppState = {
   substitutionsAt: null,
   absences: null,
   absencesAt: null,
+  homework: null,
+  homeworkAt: null,
   notes: [],
   cards: [],
   examReviews: [],
@@ -196,6 +203,7 @@ export type Action =
   | { type: 'setTimetable'; timetable: Timetable; at: string }
   | { type: 'setSubstitutions'; substitutions: SubstitutionEntry[]; at: string }
   | { type: 'setAbsences'; absences: AbsenceReport; at: string }
+  | { type: 'setHomework'; homework: HomeworkSnapshot; at: string }
   | { type: 'upsertNote'; note: LessonNote }
   | { type: 'deleteNote'; id: string }
   | { type: 'upsertCard'; card: Flashcard }
@@ -296,6 +304,8 @@ export function reducer(state: AppState, action: Action): AppState {
       return { ...state, substitutions: action.substitutions, substitutionsAt: action.at };
     case 'setAbsences':
       return { ...state, absences: action.absences, absencesAt: action.at };
+    case 'setHomework':
+      return { ...state, homework: action.homework, homeworkAt: action.at };
     case 'upsertNote':
       return { ...state, notes: upsert(state.notes, action.note) };
     case 'deleteNote':
@@ -346,7 +356,7 @@ export function reducer(state: AppState, action: Action): AppState {
     case 'deleteTopic':
       return { ...state, topics: state.topics.filter((t) => t.id !== action.id) };
     case 'addTask':
-      return { ...state, tasks: [...state.tasks, action.task] };
+      return state.tasks.some((t) => t.id === action.task.id) ? state : { ...state, tasks: [...state.tasks, action.task] };
     case 'toggleTask':
       return { ...state, tasks: state.tasks.map((t) => (t.id === action.id ? { ...t, done: !t.done } : t)) };
     case 'deleteTask':

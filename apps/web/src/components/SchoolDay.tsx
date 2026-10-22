@@ -1,4 +1,4 @@
-import { dayView, lessonsOn, splitFreePeriods, toIsoDate, type SubstitutionEntry, type TimetableLesson } from '@study/core';
+import { dayView, lessonsOn, splitFreePeriods, substitutionsStale, toIsoDate, type SubstitutionEntry, type TimetableLesson } from '@study/core';
 import { Link } from 'react-router-dom';
 import { formatAgendaDay, formatMinutes } from '../lib/format';
 import { useLanisAuto } from '../lib/lanisAuto';
@@ -33,8 +33,20 @@ function SubTag({ s }: { s: SubstitutionEntry }) {
       : s.kind === 'room' && s.room
         ? `Raum ${s.room}`
         : KIND_LABEL[s.kind];
-  return <span className={`tag ${s.kind === 'cancelled' ? 'danger' : 'warn'}`}>{label}</span>;
+  return (
+    <>
+      <span className={`tag ${s.kind === 'cancelled' ? 'danger' : 'warn'}`}>{label}</span>
+      {s.uncertain && (
+        <span className="tag warn" title="Der Plan nennt die Lehrkraft nicht oder nur das Fach. Es kann auch einen anderen Kurs deiner Stufe betreffen.">
+          unsicher
+        </span>
+      )}
+    </>
+  );
 }
+
+/** "2026-10-22T14:25" -> "22.10. 14:25" */
+const standText = (iso: string | null) => (iso ? `${iso.slice(8, 10)}.${iso.slice(5, 7)}. ${iso.slice(11, 16)}` : null);
 
 /** Schule heute (oder am nächsten Schultag): Stunden, Freistunden und Vertretungen aus Lanis. */
 export function SchoolDay() {
@@ -66,7 +78,8 @@ export function SchoolDay() {
   ].sort((a, b) => a.period - b.period);
   const changes = view.lessons.reduce((n, l) => n + l.substitutions.length, 0) + view.unmatched.length;
   const subsAge = age(state.substitutionsAt);
-  const stale = state.substitutionsAt ? Date.now() - new Date(state.substitutionsAt).getTime() > 18 * 3_600_000 : false;
+  const stale = state.substitutionsAt ? substitutionsStale(state.substitutionsAt, new Date(), iso) : false;
+  const stand = auto.dsbEnabled ? standText(auto.dsbStand) : null;
 
   return (
     <div className="card stack">
@@ -146,7 +159,7 @@ export function SchoolDay() {
           <p className="hint">Weitere Änderungen</p>
           {view.unmatched.map((s, i) => (
             <p key={i} className="notice">
-              {s.periods.length ? `${s.periods.join('.–')}. Stunde` : 'Ganztägig'}: {[s.subject, KIND_LABEL[s.kind], s.substitute, s.room, s.note].filter(Boolean).join(' · ')}
+              {s.periods.length ? `${s.periods.join('.–')}. Stunde` : 'Ganztägig'}: {[s.subject ?? s.subjectOld, KIND_LABEL[s.kind], s.substitute, s.room, s.note, s.uncertain ? 'unsicher' : null].filter(Boolean).join(' · ')}
             </p>
           ))}
         </div>
@@ -154,9 +167,10 @@ export function SchoolDay() {
 
       {state.substitutionsAt && (
         <p className="hint">
-          Vertretungsplan: Stand {subsAge}.{' '}
+          Vertretungsplan: abgerufen {subsAge}{stand ? `, Stand der Schule ${stand}` : ''}.{' '}
           {auto.enabled || auto.dsbEnabled ? (
             <>
+              {stale && <strong>Nicht mehr aktuell (keine Verbindung?). </strong>}
               Aktualisiert sich automatisch.{' '}
               <button type="button" className="link-btn" disabled={auto.busy} onClick={() => void auto.refresh(true)}>
                 {auto.busy ? 'Aktualisiere …' : 'Jetzt aktualisieren'}

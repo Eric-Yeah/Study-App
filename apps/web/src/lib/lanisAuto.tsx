@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useStore } from '../state/store';
-import { diagnoseDsb, dsbSample, type DsbDiagnosis } from '@study/core';
-import { applyLanis, DSB_ERRORS, dsbRecognized, dsbSubstitutions, LANIS_ERRORS, lanisErrorCode, type DsbResponse, type LanisResponse } from './lanisApply';
+import { CONFIG, diagnoseDsb, dsbNextStep, dsbSample, type DsbDiagnosis } from '@study/core';
+import { applyDsbPlans, applyLanis, DSB_ERRORS, LANIS_ERRORS, lanisErrorCode, type DsbResponse, type LanisResponse } from './lanisApply';
 import { decryptText, encryptText } from './secureStore';
 import { supabase } from './supabase';
 
@@ -36,6 +36,12 @@ export interface DsbInfo {
   menu: { title: string; host: string; file: string; loaded: boolean }[];
   /** Anfang jeder geladenen Seite (ohne Tags), damit man sieht, was darin steht */
   heads: string[];
+  /** Kennung des Menüs und Veröffentlichungsdatum laut DSBmobile ("22.10.2026 18:35") */
+  version?: string | null;
+  published?: string | null;
+  /** Wurde der Plan übernommen (sonst blieb der alte Stand), und waren alle Seiten da? */
+  stored?: boolean;
+  partial?: boolean;
 }
 
 export function readDsbInfo(): DsbInfo | null {
@@ -56,11 +62,28 @@ interface Meta {
   calAt: number; // letzter Abruf des Kalenders
   absAt: number; // letzter Abruf der Fehlstunden (auch wenn Lanis keine Tabelle hatte)
   tryAt: number; // letzter Versuch, auch bei Fehler
-  dsbAt: number; // letzter erfolgreicher Abruf aus DSBmobile
+  dsbAt: number; // letzter erfolgreicher voller Abruf aus DSBmobile
   dsbTryAt: number;
+  dsbCheckAt: number; // letzte erfolgreiche Verbindung zu DSBmobile (auch die leichte Prüfung)
+  dsbChangedAt: number; // wann die App zuletzt etwas Neues bei DSBmobile erkannt hat
+  dsbVersion: string | null; // Kennung des Menüs beim letzten verarbeiteten Abruf
+  dsbPublished: string | null; // Veröffentlichungsdatum laut DSBmobile
+  dsbOk: boolean; // der letzte volle Abruf wurde übernommen
 }
 
-const META0: Meta = { at: 0, calAt: 0, absAt: 0, tryAt: 0, dsbAt: 0, dsbTryAt: 0 };
+const META0: Meta = { at: 0, calAt: 0, absAt: 0, tryAt: 0, dsbAt: 0, dsbTryAt: 0, dsbCheckAt: 0, dsbChangedAt: 0, dsbVersion: null, dsbPublished: null, dsbOk: true };
+
+export interface DsbMeta {
+  checkAt: number;
+  changedAt: number;
+  published: string | null;
+}
+
+/** Wann zuletzt mit DSBmobile gesprochen wurde und wann dort zuletzt etwas Neues erschien (für die Anzeige). */
+export function readDsbMeta(): DsbMeta {
+  const m = readMeta();
+  return { checkAt: m.dsbCheckAt, changedAt: m.dsbChangedAt, published: m.dsbPublished };
+}
 
 const readMeta = (): Meta => {
   try {
@@ -97,8 +120,10 @@ interface LanisAutoApi {
   enabled: boolean;
   /** Vertretungsplan aus DSBmobile wird automatisch gelesen */
   dsbEnabled: boolean;
-  /** Zeitpunkt des letzten Abrufs aus DSBmobile (ms), ändert sich mit jedem Abruf */
+  /** Zeitpunkt des letzten Abrufs aus DSBmobile (ms), ändert sich mit jedem Abruf und jeder Prüfung */
   dsbAt: number;
+  /** "Stand" des Plans laut Plankopf der Schule ("2026-10-22T14:25"), null wenn unbekannt */
+  dsbStand: string | null;
   dsbError: string | null;
   enableDsb: (creds: DsbCreds) => Promise<void>;
   disableDsb: (reason?: string) => void;
@@ -121,6 +146,7 @@ export function LanisAutoProvider({ children }: { children: ReactNode }) {
   const [dsbEnabled, setDsbEnabled] = useState(hasDsb);
   const [dsbError, setDsbError] = useState<string | null>(null);
   const [dsbAt, setDsbAt] = useState(() => readDsbInfo()?.at ?? 0);
+  const [dsbStand, setDsbStand] = useState<string | null>(() => readDsbInfo()?.diag.stand ?? null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastAt, setLastAt] = useState(() => readMeta().at);
@@ -166,7 +192,7 @@ export function LanisAutoProvider({ children }: { children: ReactNode }) {
       setDsbError('Die Zugangsdaten konnten auf diesem Gerät nicht sicher gespeichert werden.');
       return;
     }
-    writeMeta({ ...readMeta(), dsbAt: 0, dsbTryAt: 0 });
+    writeMeta({ ...readMeta(), dsbAt: 0, dsbTryAt: 0, dsbVersion: null, dsbOk: true });
     setDsbError(null);
     setDsbEnabled(true);
   }, []);
@@ -215,10 +241,11 @@ export function LanisAutoProvider({ children }: { children: ReactNode }) {
     async (force: boolean) => {
       const meta = readMeta();
       const now = Date.now();
-      const subsAge = stateRef.current.substitutionsAt ? now - Date.parse(stateRef.current.substitutionsAt) : Infinity;
-      if (!force && (subsAge <= MAX_AGE.substitutions || now - meta.dsbTryAt < MIN_TRY_GAP)) return;
+      const s0 = stateRef.current;
+      const step = dsbNextStep({ version: meta.dsbVersion, ok: meta.dsbOk, tryAt: meta.dsbTryAt }, s0.substitutionsAt ? Date.parse(s0.substitutionsAt) : null, now, force);
+      if (step === 'skip') return;
       // Der Plan gilt für die ganze Schule, ohne Stundenplan ließe sich nicht auf deine Stunden filtern.
-      if (!stateRef.current.timetable) {
+      if (!s0.timetable) {
         setDsbError('Hol zuerst deinen Stundenplan aus Lanis. Damit sucht die App aus dem Plan der ganzen Schule deine Vertretungen heraus.');
         return;
       }
@@ -227,32 +254,82 @@ export function LanisAutoProvider({ children }: { children: ReactNode }) {
         const raw = await decryptText(localStorage.getItem(DSB_KEY));
         const creds = raw ? (JSON.parse(raw) as DsbCreds) : null;
         if (!creds) return disableDsb('Die gespeicherten Zugangsdaten sind nicht mehr lesbar. Verbinde DSBmobile neu.');
-        const { data, error: err } = await supabase.functions.invoke<DsbResponse>('dsb-plan', { body: { dsbUser: creds.user, dsbPassword: creds.password } });
-        if (err || !data) {
-          const code = await lanisErrorCode(err);
-          if (code === 'login_failed') return disableDsb(`${DSB_ERRORS.login_failed} Die Automatik ist ausgeschaltet.`);
-          setDsbError(code ? DSB_ERRORS[code] ?? null : 'Aktualisierung aus DSBmobile gerade nicht möglich.');
-          return;
+        const call = async (onlyMenu: boolean): Promise<DsbResponse | null> => {
+          const { data, error: err } = await supabase.functions.invoke<DsbResponse>('dsb-plan', {
+            body: { dsbUser: creds.user, dsbPassword: creds.password, ...(onlyMenu ? { onlyMenu: true } : {}) },
+          });
+          if (err || !data) {
+            const code = await lanisErrorCode(err);
+            if (code === 'login_failed') disableDsb(`${DSB_ERRORS.login_failed} Die Automatik ist ausgeschaltet.`);
+            else setDsbError(code ? DSB_ERRORS[code] ?? null : 'Aktualisierung aus DSBmobile gerade nicht möglich.');
+            return null;
+          }
+          return data;
+        };
+
+        // Leichte Prüfung: nur das Menü. Nur wenn sich die Kennung ändert, kommt der volle Abruf.
+        let changed = false;
+        if (step === 'check') {
+          const light = await call(true);
+          if (!light) return;
+          const m = readMeta();
+          if (light.version && light.version === m.dsbVersion) {
+            writeMeta({ ...m, dsbCheckAt: Date.now(), dsbPublished: light.published ?? m.dsbPublished });
+            setDsbAt(Date.now());
+            setDsbError(null);
+            return;
+          }
+          changed = true;
         }
+
+        const data = await call(false);
+        if (!data) return;
+        const at = Date.now();
+        const latest = stateRef.current;
+        const applied = applyDsbPlans(data, latest.timetable, latest.substitutions);
+        const m = readMeta();
+        const isNew = changed || (data.version ?? null) !== m.dsbVersion;
         const pages = (data.plans ?? []).map((p) => p.html);
         try {
-          const at = Date.now();
           const heads = pages.map((h) => h.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 500));
           localStorage.setItem(
             DIAG_KEY,
-            JSON.stringify({ at, diag: diagnoseDsb(pages, stateRef.current.timetable), sample: dsbSample(pages), menu: data.menu ?? [], heads } satisfies DsbInfo),
+            JSON.stringify({
+              at,
+              diag: diagnoseDsb(pages, latest.timetable),
+              sample: dsbSample(pages),
+              menu: data.menu ?? [],
+              heads,
+              version: data.version ?? null,
+              published: data.published ?? null,
+              stored: applied.next !== null,
+              partial: data.partial === true,
+            } satisfies DsbInfo),
           );
-          setDsbAt(at);
         } catch {
           // ignorieren
         }
-        if (!dsbRecognized(data)) {
-          setDsbError('Der Vertretungsplan hat einen Aufbau, den die App noch nicht lesen kann. Der alte Stand bleibt erhalten.');
+        if (applied.next === null) {
+          // Kaputter oder leerer Abruf: der gespeicherte Stand bleibt, der Abruf zählt als nicht übernommen (bald wieder versuchen)
+          writeMeta({ ...m, dsbVersion: data.version ?? m.dsbVersion, dsbOk: false, dsbCheckAt: at, dsbTryAt: at, dsbPublished: data.published ?? m.dsbPublished });
+          setDsbAt(at);
+          setDsbError(applied.message);
           return;
         }
-        dispatch({ type: 'setSubstitutions', substitutions: dsbSubstitutions(data, stateRef.current.timetable), at: new Date().toISOString() });
-        writeMeta({ ...readMeta(), dsbAt: Date.now(), dsbTryAt: Date.now() });
-        setDsbError(null);
+        dispatch({ type: 'setSubstitutions', substitutions: applied.next, at: new Date(at).toISOString() });
+        writeMeta({
+          ...m,
+          dsbAt: at,
+          dsbTryAt: at,
+          dsbCheckAt: at,
+          dsbChangedAt: isNew ? at : m.dsbChangedAt,
+          dsbVersion: data.version ?? null,
+          dsbPublished: data.published ?? m.dsbPublished,
+          dsbOk: data.partial !== true && applied.read.incomplete.length === 0,
+        });
+        setDsbAt(at);
+        setDsbStand(applied.read.stand);
+        setDsbError(applied.message);
       } catch {
         setDsbError('Aktualisierung aus DSBmobile gerade nicht möglich.');
       }
@@ -283,7 +360,10 @@ export function LanisAutoProvider({ children }: { children: ReactNode }) {
     const onVisible = () => document.visibilityState === 'visible' && void refresh();
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('online', onVisible);
+    // Bei geöffneter, sichtbarer App alle paar Minuten bei DSBmobile nachsehen, ob es etwas Neues gibt (leichte Prüfung, siehe dsbNextStep)
+    const every = window.setInterval(onVisible, CONFIG.dsb.checkEveryMin * 60_000);
     return () => {
+      window.clearInterval(every);
       window.clearTimeout(first);
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('online', onVisible);
@@ -291,8 +371,8 @@ export function LanisAutoProvider({ children }: { children: ReactNode }) {
   }, [enabled, dsbEnabled, refresh]);
 
   const value = useMemo(
-    () => ({ enabled, busy, error, lastAt, enable, disable, refresh, dsbEnabled, dsbError, enableDsb, disableDsb, dsbAt }),
-    [enabled, busy, error, lastAt, enable, disable, refresh, dsbEnabled, dsbError, dsbAt, enableDsb, disableDsb],
+    () => ({ enabled, busy, error, lastAt, enable, disable, refresh, dsbEnabled, dsbError, enableDsb, disableDsb, dsbAt, dsbStand }),
+    [enabled, busy, error, lastAt, enable, disable, refresh, dsbEnabled, dsbError, dsbAt, dsbStand, enableDsb, disableDsb],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

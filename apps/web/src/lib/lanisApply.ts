@@ -1,14 +1,16 @@
 import {
+  dsbForStudent,
   extractAbsenceTable,
-  forStudent,
+  mergeSubstitutions,
   parseAbsences,
   parseSubstitutions,
-  parseUntisPlan,
   parseTimetable,
   planImport,
+  readDsbPlans,
   toIsoDate,
   type AbsenceReport,
   type Exam,
+  type DsbRead,
   type ImportItem,
   type LanisEvent,
   type Subject,
@@ -54,6 +56,14 @@ export interface DsbResponse {
   updated?: string | null;
   /** Was DSBmobile angeboten hat und was davon geladen wurde (zur Fehlersuche) */
   menu?: { title: string; host: string; file: string; loaded: boolean }[];
+  /** Kennung des Menüs: ändert sich, wenn DSBmobile etwas Neues veröffentlicht */
+  version?: string;
+  /** Neuestes Veröffentlichungsdatum im Menü ("22.10.2026 18:35") */
+  published?: string | null;
+  /** Nicht alle Plan-Seiten waren ladbar */
+  partial?: boolean;
+  failed?: number;
+  onlyMenu?: boolean;
 }
 
 export const DSB_ERRORS: Record<string, string> = {
@@ -65,16 +75,36 @@ export const DSB_ERRORS: Record<string, string> = {
   unauthorized: 'Bitte melde dich neu an.',
 };
 
-/** Vertretungen für dich aus den Plänen der ganzen Schule: nur passende Stufe und eigene Stunden (siehe forStudent). */
-export function dsbSubstitutions(data: DsbResponse, timetable: Timetable | null): SubstitutionEntry[] {
-  const all = (data.plans ?? []).flatMap((p) => parseUntisPlan(p.html));
-  return forStudent(all, timetable);
-}
-
-/** Sieht mindestens eine Seite wie ein Untis-Plan aus (oder gibt es gar keine Seite)? Sonst weiß die App nicht, was der Plan sagt. */
-export function dsbRecognized(data: DsbResponse): boolean {
-  const plans = data.plans ?? [];
-  return plans.length === 0 || plans.some((p) => /mon_title|mon_list/.test(p.html));
+/**
+ * Neuer Stand der Vertretungen aus einer Antwort von dsb-plan. next ist null, wenn der alte Stand bleiben muss
+ * (nichts Lesbares, kein gültiger Tag ab heute); message sagt dann warum, oder weist bei einer unvollständigen Antwort darauf hin.
+ * Einzelne fehlende Seiten ersetzen nie den alten Stand der betroffenen Tage (siehe mergeSubstitutions).
+ */
+export function applyDsbPlans(
+  data: DsbResponse,
+  timetable: Timetable | null,
+  previous: SubstitutionEntry[],
+  now: Date = new Date(),
+): { read: DsbRead; next: SubstitutionEntry[] | null; message: string | null } {
+  const read = readDsbPlans((data.plans ?? []).map((p) => p.html), now);
+  if (!read.usable) {
+    const pages = (data.plans ?? []).length;
+    const message =
+      pages === 0
+        ? 'DSBmobile hat gerade keinen Vertretungsplan veröffentlicht. Der alte Stand bleibt erhalten.'
+        : read.tables.some((t) => t.problem === 'date_past' || t.problem === 'date_future' || t.problem === 'date_weekday' || t.problem === 'date_weekend' || t.problem === 'date_missing')
+          ? 'Der Plan von DSBmobile hat kein gültiges Datum für heute oder später. Der alte Stand bleibt erhalten.'
+          : 'Der Vertretungsplan hat einen Aufbau, den die App nicht sicher lesen kann. Der alte Stand bleibt erhalten.';
+    return { read, next: null, message };
+  }
+  const partial = data.partial === true || read.incomplete.length > 0;
+  const { mine } = dsbForStudent(read, timetable);
+  const next = mergeSubstitutions(previous, mine, read, partial, toIsoDate(now));
+  return {
+    read,
+    next,
+    message: partial ? 'Nicht alle Seiten des Plans konnten geladen werden. Für die betroffenen Tage bleibt der alte Stand erhalten.' : null,
+  };
 }
 
 /** Fehlstunden aus der Anwesenheitstabelle von Lanis, null wenn nichts Lesbares da ist. */

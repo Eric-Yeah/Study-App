@@ -330,6 +330,24 @@ export const CONFIG = {
     a4: { width: 595.28, height: 841.89 }, // Punkte
     folderMaxPages: 400, // Lernordner (alle PDFs eines Fachs zu einem), Schutz für den Speicher auf dem iPad
   },
+  dsb: {
+    // Plausibilität der Pläne aus DSBmobile: Stunden 1 bis maxPeriod, ein Eintrag höchstens maxSpan Stunden lang
+    maxPeriod: 14,
+    maxSpan: 8,
+    // Pläne von gestern an bis in so vielen Tagen werden akzeptiert (Datum davor oder danach gilt als unplausibel)
+    pastDays: 1,
+    futureDays: 21,
+    // Ab so vielen Stunden seit dem Abruf gilt der Stand als veraltet (die App prüft DSBmobile bei geöffneter App alle paar Minuten)
+    staleHours: 18,
+    // Prüfung auf Neues bei DSBmobile (nur das Menü, ein Aufruf): frühestens alle checkGapMin Minuten je Gerät, bei sichtbarer App
+    // alle checkEveryMin Minuten. Die Function erlaubt 20 Aufrufe je Konto in 10 Minuten, hier kommen höchstens 3 je Gerät.
+    checkGapMin: 4,
+    checkEveryMin: 8,
+    // Voller Abruf spätestens nach so vielen Stunden, auch wenn DSBmobile nichts Neues meldet
+    fullMaxAgeHours: 3,
+    // Nach einem Abruf, dessen Plan nicht übernommen wurde (kaputt oder unvollständig), frühestens nach so vielen Minuten erneut
+    retryGapMin: 10,
+  },
   school: {
     // Eine Freistunde zwischen diesen beiden Stunden (ausschließlich) ist Mittagspause zum Essen, nicht zum Lernen.
     lunchAfterPeriod: 6,

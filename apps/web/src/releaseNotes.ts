@@ -15,6 +15,13 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     version: '2026.10.22.3',
     date: '22. Oktober 2026',
     items: [
+      { icon: '🔎', title: 'DSBmobile: Was wurde gelesen?', text: 'Unter Einstellungen → Vertretungsplan (DSBmobile) siehst du jetzt nach jedem Abruf, wie viele Einträge im Plan deiner Schule standen und wie viele davon zu dir passen (und warum der Rest nicht). Passt etwas nicht, kannst du den Plan-Ausschnitt kopieren.' },
+    ],
+  },
+  {
+    version: '2026.10.22.3',
+    date: '22. Oktober 2026',
+    items: [
       { icon: '🔔', title: 'Ton am Ende des Timers', text: 'Auf Wunsch erklingt ein kurzer Ton, wenn eine Fokus- oder Pausenphase abläuft. Er ist standardmäßig aus. Beim ersten Fokus-Start eines Tages fragt dich die App, ob er ertönen soll; in Einstellungen → Timer-Ton kannst du ihn jederzeit ein- und ausschalten und testen. Die Einstellung gilt für das jeweilige Gerät.' },
     ],
   },

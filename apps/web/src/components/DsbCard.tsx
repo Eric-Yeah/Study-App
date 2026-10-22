@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { useLanisAuto } from '../lib/lanisAuto';
+import { readDsbInfo, useLanisAuto } from '../lib/lanisAuto';
 
 /** Einstellungen: Vertretungsplan aus DSBmobile. Die Zugangsdaten bleiben verschlüsselt nur auf diesem Gerät. */
 export function DsbCard() {
@@ -58,11 +58,47 @@ export function DsbCard() {
           </button>
         </form>
       )}
+      {auto.dsbEnabled && <DsbResult key={auto.dsbAt} />}
       {auto.dsbError && (
         <p className="notice" role="alert">
           {auto.dsbError}
         </p>
       )}
+    </div>
+  );
+}
+
+/** Was der letzte Abruf gebracht hat, damit man sieht, ob etwas angekommen ist und warum etwas fehlt. */
+function DsbResult() {
+  const info = readDsbInfo();
+  const [copied, setCopied] = useState(false);
+  if (!info) return <p className="hint">Noch kein Abruf. Tippe auf „Jetzt aktualisieren“.</p>;
+  const { diag: d } = info;
+  const when = new Date(info.at).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  const copy = async () => {
+    const text = `Spalten: ${d.headers.join(' | ')}\nKlassen: ${d.klassSamples.join(', ')}\nStufen im Stundenplan: ${d.levels.join(', ') || '–'}\n\n${info.sample}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+    } catch {
+      // ignorieren
+    }
+  };
+  return (
+    <div className="stack" style={{ gap: 6 }}>
+      <p className="hint">
+        Letzter Abruf {when}: {d.recognized} von {d.pages} {d.pages === 1 ? 'Seite' : 'Seiten'} gelesen, {d.total} Einträge im Plan der Schule
+        {d.dates.length > 0 ? ` (${d.dates.map((x) => x.slice(8) + '.' + x.slice(5, 7) + '.').join(', ')})` : ''}.{' '}
+        <strong>{d.mine} davon für dich</strong>
+        {d.total > 0 && d.mine < d.total
+          ? ` (nicht passend: ${d.dropped.klass} andere Klasse, ${d.dropped.lesson} keine Stunde von dir, ${d.dropped.subject} anderes Fach)`
+          : ''}
+        .
+      </p>
+      {d.total === 0 && d.pages > 0 && <p className="hint">Im Plan stehen keine Einträge, oder die App versteht den Aufbau nicht. Kopiere den Ausschnitt und schick ihn weiter.</p>}
+      <button type="button" className="btn btn-ghost" onClick={() => void copy()}>
+        {copied ? 'Kopiert' : 'Plan-Ausschnitt kopieren (für die Fehlersuche)'}
+      </button>
     </div>
   );
 }

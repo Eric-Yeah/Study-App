@@ -158,16 +158,82 @@ export function classMatches(klass: string | null, levels: string[]): boolean {
 export function forStudent(entries: DsbEntry[], tt: Timetable | null): DsbEntry[] {
   if (!tt) return entries;
   const levels = ownLevels(tt);
-  return entries.filter((e) => {
-    if (!classMatches(e.klass, levels)) return false;
-    const mine = lessonsOn(tt, e.date).filter((l) => e.periods.some((p) => p >= l.period && p < l.period + l.span));
-    if (mine.length === 0) return false;
-    const names = [e.subject, e.subjectOld].filter((x): x is string => Boolean(x));
-    if (names.length === 0) return true; // Plan ohne Fach: die Stunde allein entscheidet
-    return mine.some(
-      (l) =>
-        names.some((n) => subjectMatchesAbbr(n, l.abbr)) ||
-        (e.teacher !== null && l.teacher !== '' && e.teacher.toLowerCase() === l.teacher.toLowerCase()),
-    );
-  });
+  return entries.filter((e) => studentCheck(e, tt, levels) === 'ok');
+}
+
+/** Warum ein Eintrag zu dir passt ('ok') oder nicht: falsche Klasse, keine eigene Stunde zu der Zeit, anderes Fach. */
+export function studentCheck(e: DsbEntry, tt: Timetable, levels: string[] = ownLevels(tt)): 'ok' | 'klass' | 'lesson' | 'subject' {
+  if (!classMatches(e.klass, levels)) return 'klass';
+  const mine = lessonsOn(tt, e.date).filter((l) => e.periods.some((p) => p >= l.period && p < l.period + l.span));
+  if (mine.length === 0) return 'lesson';
+  const names = [e.subject, e.subjectOld].filter((x): x is string => Boolean(x));
+  if (names.length === 0) return 'ok'; // Plan ohne Fach: die Stunde allein entscheidet
+  const fits = mine.some(
+    (l) =>
+      names.some((n) => subjectMatchesAbbr(n, l.abbr)) ||
+      (e.teacher !== null && l.teacher !== '' && e.teacher.toLowerCase() === l.teacher.toLowerCase()),
+  );
+  return fits ? 'ok' : 'subject';
+}
+
+export interface DsbDiagnosis {
+  /** Seiten, davon wie Untis-Pläne erkannt */
+  pages: number;
+  recognized: number;
+  /** Einträge im Plan der ganzen Schule */
+  total: number;
+  dates: string[];
+  /** Stufen aus deinem Stundenplan */
+  levels: string[];
+  /** Einträge deiner Stufe, und die, die zu dir passen */
+  ofLevel: number;
+  mine: number;
+  /** Warum Einträge nicht passen */
+  dropped: { klass: number; lesson: number; subject: number };
+  /** Beispielwerte aus dem Plan: Spaltenüberschriften und erste Klassenangaben */
+  headers: string[];
+  klassSamples: string[];
+}
+
+/** Zusammenfassung für die Fehlersuche: was stand im Plan und was davon ist bei dir gelandet. */
+export function diagnoseDsb(pages: string[], tt: Timetable | null, year = new Date().getFullYear()): DsbDiagnosis {
+  const all = pages.flatMap((h) => parseUntisPlan(h, year));
+  const levels = tt ? ownLevels(tt) : [];
+  const dropped = { klass: 0, lesson: 0, subject: 0 };
+  let mine = 0;
+  if (tt) {
+    for (const e of all) {
+      const r = studentCheck(e, tt, levels);
+      if (r === 'ok') mine++;
+      else dropped[r]++;
+    }
+  }
+  const headers = [
+    ...new Set(
+      pages.flatMap((h) =>
+        [...(/<table\b[^>]*mon_list[^>]*>[\s\S]*?<tr\b[^>]*>([\s\S]*?)<\/tr>/i.exec(h)?.[1] ?? '').matchAll(/<th\b[^>]*>([\s\S]*?)<\/th>/gi)].map((m) => plainText(m[1])),
+      ),
+    ),
+  ].slice(0, 20);
+  return {
+    pages: pages.length,
+    recognized: pages.filter((h) => /mon_title|mon_list/.test(h)).length,
+    total: all.length,
+    dates: [...new Set(all.map((e) => e.date))].sort(),
+    levels,
+    ofLevel: all.filter((e) => classMatches(e.klass, levels)).length,
+    mine,
+    dropped,
+    headers,
+    klassSamples: [...new Set(all.map((e) => e.klass ?? '–'))].slice(0, 12),
+  };
+}
+
+/** Anfang der ersten Plan-Tabelle (Kopfzeile und die ersten Zeilen) zum Kopieren, höchstens 5000 Zeichen. */
+export function dsbSample(pages: string[]): string {
+  for (const h of pages) {
+    const at = h.search(/<table\b[^>]*mon_list/i);
+    if (at >= 0) return h.slice(Math.max(0, h.lastIndexOf('mon_title', at) - 30), at + 5000).slice(0, 5000);
+  }
+  return '';
 }

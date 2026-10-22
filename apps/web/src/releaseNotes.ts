@@ -12,6 +12,13 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '2026.10.22.5',
+    date: '22. Oktober 2026',
+    items: [
+      { icon: '📋', title: 'Vertretungsplan: Entfall wird erkannt', text: 'Der Plan deiner Schule ist nach Klassen gruppiert („Q1“ als Zwischenzeile, alte Werte durchgestrichen). Die App liest das jetzt: „Eigenverantwortliches Arbeiten“ in deiner Geschichtsstunde erscheint auf Heute als Entfall. Auch Kurscodes wie „Q1INFO_LK01“ werden dem Fach zugeordnet.' },
+    ],
+  },
+  {
     version: '2026.10.22.4',
     date: '22. Oktober 2026',
     items: [

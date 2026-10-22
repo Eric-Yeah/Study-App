@@ -1,7 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { SoundQuestion } from '../components/SoundQuestion';
 import { useUserId } from '../lib/auth';
 import { formatClock, uid } from '../lib/format';
 import { supabase } from '../lib/supabase';
+import { answerSoundQuestion, chimeIfOn, needsSoundQuestion, unlockAudio } from '../lib/timerSound';
 import { useStore, type TimerSettings } from '../state/store';
 import type { TimerPhase, TimerState } from './types';
 
@@ -83,6 +85,27 @@ export function TimerProvider({ children }: { children: ReactNode }) {
   });
   const timerRef = useRef(timer);
   timerRef.current = timer;
+
+  // Einmal am Tag vor dem ersten Fokus-Start fragen, ob am Ende ein Ton erklingen soll. Der Start wartet auf die Antwort.
+  const [asking, setAsking] = useState(false);
+  const pendingStart = useRef<(() => void) | null>(null);
+  const withSoundQuestion = useCallback((begin: () => void) => {
+    unlockAudio(); // innerhalb der Berührung, sonst bleibt der Ton am Ende stumm
+    if (!needsSoundQuestion()) {
+      begin();
+      return;
+    }
+    pendingStart.current = begin;
+    setAsking(true);
+  }, []);
+  const answerSound = (on: boolean) => {
+    answerSoundQuestion(on);
+    if (on) unlockAudio();
+    setAsking(false);
+    const begin = pendingStart.current;
+    pendingStart.current = null;
+    begin?.();
+  };
 
   // Lokale Änderung: speichern und an den Server schicken.
   const commit = useCallback(
@@ -184,6 +207,7 @@ export function TimerProvider({ children }: { children: ReactNode }) {
     } catch {
       /* ignorieren */
     }
+    chimeIfOn();
     commit({ ...timer, ...nextPhase(timer), status: 'idle', startedAt: null, elapsedMs: 0, runId: null });
   }, [now, timer, recordFocus, nextPhase, commit]);
 
@@ -210,18 +234,29 @@ export function TimerProvider({ children }: { children: ReactNode }) {
       progress: timer.durationMs ? Math.min(1, elapsed / timer.durationMs) : 0,
       synced,
       start: () => {
+        const begin = () => {
+          const t = timerRef.current;
+          if (t.status === 'running') return;
+          setNow(Date.now());
+          commit({ ...t, status: 'running', startedAt: Date.now(), runId: t.runId ?? uid() });
+        };
         const t = timerRef.current;
-        if (t.status === 'running') return;
-        setNow(Date.now());
-        commit({ ...t, status: 'running', startedAt: Date.now(), runId: t.runId ?? uid() });
+        if (t.status === 'idle' && t.phase === 'focus') withSoundQuestion(begin);
+        else {
+          if (t.status !== 'running') unlockAudio();
+          begin();
+        }
       },
       startWith: ({ subjectId, minutes }) => {
-        const t = timerRef.current;
-        if (t.status !== 'idle') return;
-        const now = Date.now();
-        setNow(now);
-        const durationMs = minutes && minutes > 0 ? Math.round(minutes) * 60_000 : phaseMs('focus', app.timer);
-        commit({ ...t, phase: 'focus', subjectId, durationMs, status: 'running', startedAt: now, elapsedMs: 0, runId: uid() });
+        if (timerRef.current.status !== 'idle') return;
+        withSoundQuestion(() => {
+          const t = timerRef.current;
+          if (t.status !== 'idle') return;
+          const now = Date.now();
+          setNow(now);
+          const durationMs = minutes && minutes > 0 ? Math.round(minutes) * 60_000 : phaseMs('focus', app.timer);
+          commit({ ...t, phase: 'focus', subjectId, durationMs, status: 'running', startedAt: now, elapsedMs: 0, runId: uid() });
+        });
       },
       setLength: (minutes) => {
         const t = timerRef.current;
@@ -245,9 +280,14 @@ export function TimerProvider({ children }: { children: ReactNode }) {
       },
       setSubject: (id) => commit({ ...timerRef.current, subjectId: id }),
     };
-  }, [timer, now, synced, commit, recordFocus, nextPhase, app.timer]);
+  }, [timer, now, synced, commit, recordFocus, nextPhase, app.timer, withSoundQuestion]);
 
-  return <TimerContext.Provider value={api}>{children}</TimerContext.Provider>;
+  return (
+    <TimerContext.Provider value={api}>
+      {children}
+      {asking && <SoundQuestion onAnswer={answerSound} />}
+    </TimerContext.Provider>
+  );
 }
 
 export function useTimer() {

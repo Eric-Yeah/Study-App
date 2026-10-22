@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useStore } from '../state/store';
+import { diagnoseDsb, dsbSample, type DsbDiagnosis } from '@study/core';
 import { applyLanis, DSB_ERRORS, dsbRecognized, dsbSubstitutions, LANIS_ERRORS, lanisErrorCode, type DsbResponse, type LanisResponse } from './lanisApply';
 import { decryptText, encryptText } from './secureStore';
 import { supabase } from './supabase';
@@ -15,6 +16,7 @@ import { supabase } from './supabase';
 
 const CREDS_KEY = 'study-app-lanis-creds';
 const DSB_KEY = 'study-app-dsb-creds';
+const DIAG_KEY = 'study-app-dsb-diag';
 const META_KEY = 'study-app-lanis-meta';
 const HOUR = 3_600_000;
 const MAX_AGE = { substitutions: 3 * HOUR, timetable: 24 * HOUR, calendar: 12 * HOUR, absences: 12 * HOUR };
@@ -24,6 +26,21 @@ export interface LanisCreds {
   schoolId: string;
   username: string;
   password: string;
+}
+
+/** Was der letzte Abruf aus DSBmobile gebracht hat (zur Fehlersuche, enthält keine Zugangsdaten). */
+export interface DsbInfo {
+  at: number;
+  diag: DsbDiagnosis;
+  sample: string;
+}
+
+export function readDsbInfo(): DsbInfo | null {
+  try {
+    return JSON.parse(localStorage.getItem(DIAG_KEY) ?? 'null') as DsbInfo | null;
+  } catch {
+    return null;
+  }
 }
 
 export interface DsbCreds {
@@ -77,6 +94,8 @@ interface LanisAutoApi {
   enabled: boolean;
   /** Vertretungsplan aus DSBmobile wird automatisch gelesen */
   dsbEnabled: boolean;
+  /** Zeitpunkt des letzten Abrufs aus DSBmobile (ms), ändert sich mit jedem Abruf */
+  dsbAt: number;
   dsbError: string | null;
   enableDsb: (creds: DsbCreds) => Promise<void>;
   disableDsb: (reason?: string) => void;
@@ -98,6 +117,7 @@ export function LanisAutoProvider({ children }: { children: ReactNode }) {
   const [enabled, setEnabled] = useState(hasCreds);
   const [dsbEnabled, setDsbEnabled] = useState(hasDsb);
   const [dsbError, setDsbError] = useState<string | null>(null);
+  const [dsbAt, setDsbAt] = useState(() => readDsbInfo()?.at ?? 0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastAt, setLastAt] = useState(() => readMeta().at);
@@ -211,6 +231,14 @@ export function LanisAutoProvider({ children }: { children: ReactNode }) {
           setDsbError(code ? DSB_ERRORS[code] ?? null : 'Aktualisierung aus DSBmobile gerade nicht möglich.');
           return;
         }
+        const pages = (data.plans ?? []).map((p) => p.html);
+        try {
+          const at = Date.now();
+          localStorage.setItem(DIAG_KEY, JSON.stringify({ at, diag: diagnoseDsb(pages, stateRef.current.timetable), sample: dsbSample(pages) } satisfies DsbInfo));
+          setDsbAt(at);
+        } catch {
+          // ignorieren
+        }
         if (!dsbRecognized(data)) {
           setDsbError('Der Vertretungsplan hat einen Aufbau, den die App noch nicht lesen kann. Der alte Stand bleibt erhalten.');
           return;
@@ -256,8 +284,8 @@ export function LanisAutoProvider({ children }: { children: ReactNode }) {
   }, [enabled, dsbEnabled, refresh]);
 
   const value = useMemo(
-    () => ({ enabled, busy, error, lastAt, enable, disable, refresh, dsbEnabled, dsbError, enableDsb, disableDsb }),
-    [enabled, busy, error, lastAt, enable, disable, refresh, dsbEnabled, dsbError, enableDsb, disableDsb],
+    () => ({ enabled, busy, error, lastAt, enable, disable, refresh, dsbEnabled, dsbError, enableDsb, disableDsb, dsbAt }),
+    [enabled, busy, error, lastAt, enable, disable, refresh, dsbEnabled, dsbError, dsbAt, enableDsb, disableDsb],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

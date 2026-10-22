@@ -4,6 +4,7 @@ import { AdminLog } from '../components/AdminLog';
 import { DevicesCard } from '../components/DevicesCard';
 import { FitnessLink } from '../components/FitnessLink';
 import { PushCard } from '../components/PushCard';
+import { TimerSoundCard } from '../components/TimerSoundCard';
 import { DsbCard } from '../components/DsbCard';
 import { LanisAutoCard } from '../components/LanisAutoCard';
 import { PasswordForm } from '../components/PasswordForm';
@@ -129,6 +130,8 @@ export function Settings() {
       <LanisAutoCard />
 
       <DsbCard />
+
+      <TimerSoundCard />
 
       <PushCard />
 

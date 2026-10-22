@@ -400,3 +400,30 @@ export function readHomework(raw: unknown): HomeworkSnapshot | null {
   }
   return { items, imported: Array.isArray(r.imported) ? (r.imported as unknown[]).filter(isStr) : [] };
 }
+
+export type DueTone = 'late' | 'today' | 'soon' | 'later';
+
+export interface DueInfo {
+  /** Tage bis zur Abgabe (negativ: überfällig) */
+  days: number;
+  /** "heute fällig", "morgen fällig", "in 3 Tagen fällig", "seit 2 Tagen überfällig" */
+  label: string;
+  tone: DueTone;
+}
+
+const dayNumber = (iso: string) => Math.round(Date.parse(`${iso}T12:00:00Z`) / 86_400_000);
+
+/** Wie weit die Abgabe entfernt ist, in Worten und mit einer Stufe für die Farbe (soon: heute bis übermorgen). */
+export function dueInfo(due: string, today: string): DueInfo {
+  const days = dayNumber(due) - dayNumber(today);
+  if (days < 0) return { days, label: days === -1 ? 'seit gestern überfällig' : `seit ${-days} Tagen überfällig`, tone: 'late' };
+  if (days === 0) return { days, label: 'heute fällig', tone: 'today' };
+  if (days === 1) return { days, label: 'morgen fällig', tone: 'soon' };
+  return { days, label: `in ${days} Tagen fällig`, tone: days <= 2 ? 'soon' : 'later' };
+}
+
+/** Überschrift einer Gruppe nach Abgabetag: Überfällig, Heute, Morgen, sonst der Tag (die Seite schreibt das Datum dazu). */
+export function dueGroup(due: string, today: string): 'late' | 'today' | 'tomorrow' | 'day' {
+  const d = dayNumber(due) - dayNumber(today);
+  return d < 0 ? 'late' : d === 0 ? 'today' : d === 1 ? 'tomorrow' : 'day';
+}

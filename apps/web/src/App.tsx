@@ -10,7 +10,7 @@ import { RubricPage } from './pages/RubricPage';
 import { Weaknesses } from './pages/Weaknesses';
 import { Abitur } from './pages/Abitur';
 import { Cards } from './pages/Cards';
-import { Homework } from './pages/Homework';
+import { Homework, Worksheets } from './pages/Homework';
 import { Exams } from './pages/Exams';
 import { Corrections, PracticeExams } from './components/exam/Corrections';
 import { SectionTabs } from './components/SectionTabs';
@@ -49,7 +49,7 @@ function NavItems({ withSettings = false }: { withSettings?: boolean }) {
   const items = withSettings ? [...MAIN_AREAS, SETTINGS_AREA] : MAIN_AREAS;
   return (
     <>
-      {items.map(({ id, to, label, icon: Icon }) => (
+      {items.map(({ id, to, label, short, icon: Icon }) => (
         <Link
           key={id}
           to={to}
@@ -57,7 +57,14 @@ function NavItems({ withSettings = false }: { withSettings?: boolean }) {
           className={`nav-link${current === id ? ' active' : ''}${id === 'einstellungen' ? ' nav-settings' : ''}`}
         >
           <Icon size={20} aria-hidden="true" />
-          <span>{label}</span>
+          {short ? (
+            <span>
+              <span className="nav-full">{label}</span>
+              <span className="nav-short">{short}</span>
+            </span>
+          ) : (
+            <span>{label}</span>
+          )}
         </Link>
       ))}
     </>
@@ -151,6 +158,7 @@ export function App() {
               <Route path="notizen" element={<Notes />} />
               <Route path="karten" element={<Cards />} />
               <Route path="hausaufgaben" element={<Homework />} />
+              <Route path="arbeitsblaetter" element={<Worksheets />} />
               <Route path="klausuren" element={<Exams />} />
               <Route path="rueckblick" element={<Review />} />
               <Route path="faecher" element={<Subjects />} />

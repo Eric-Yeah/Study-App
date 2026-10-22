@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildHomework, courseBase, readHomework, diagnoseBooks, dueDateFor, fileKey, importableType, newFiles, parseCourseBook, planHomework, subjectForCourse } from './homework';
+import { buildHomework, courseBase, dueGroup, dueInfo, readHomework, diagnoseBooks, dueDateFor, fileKey, importableType, newFiles, parseCourseBook, planHomework, subjectForCourse } from './homework';
 import type { Timetable } from './lanisPlans';
 
 // Erfundene Kursseite im Aufbau der echten Seiten von "Mein Unterricht" (meinunterricht.php?a=sus_view&id=…)
@@ -180,5 +180,29 @@ describe('Gespeicherten Stand lesen', () => {
     expect(readHomework(null)).toBeNull();
     expect(readHomework({ items: 'x' })).toBeNull();
     expect(readHomework([])).toBeNull();
+  });
+});
+
+describe('Fälligkeit', () => {
+  it('beschreibt die Entfernung in Worten und Stufen', () => {
+    expect(dueInfo('2026-10-22', '2026-10-22')).toEqual({ days: 0, label: 'heute fällig', tone: 'today' });
+    expect(dueInfo('2026-10-23', '2026-10-22')).toEqual({ days: 1, label: 'morgen fällig', tone: 'soon' });
+    expect(dueInfo('2026-10-24', '2026-10-22')).toEqual({ days: 2, label: 'in 2 Tagen fällig', tone: 'soon' });
+    expect(dueInfo('2026-10-26', '2026-10-22')).toEqual({ days: 4, label: 'in 4 Tagen fällig', tone: 'later' });
+    expect(dueInfo('2026-10-21', '2026-10-22')).toEqual({ days: -1, label: 'seit gestern überfällig', tone: 'late' });
+    expect(dueInfo('2026-10-19', '2026-10-22').label).toBe('seit 3 Tagen überfällig');
+  });
+
+  it('rechnet über Monats- und Jahresgrenzen und die Zeitumstellung richtig', () => {
+    expect(dueInfo('2026-11-02', '2026-10-30').days).toBe(3);
+    expect(dueInfo('2027-01-02', '2026-12-30').days).toBe(3);
+    expect(dueInfo('2026-10-27', '2026-10-24').days).toBe(3); // Zeitumstellung am 25.10.2026
+  });
+
+  it('ordnet in Gruppen', () => {
+    expect(dueGroup('2026-10-20', '2026-10-22')).toBe('late');
+    expect(dueGroup('2026-10-22', '2026-10-22')).toBe('today');
+    expect(dueGroup('2026-10-23', '2026-10-22')).toBe('tomorrow');
+    expect(dueGroup('2026-10-30', '2026-10-22')).toBe('day');
   });
 });

@@ -1,6 +1,9 @@
 import {
   addDays,
   downloadRequest,
+  dueDateFor,
+  dueGroup,
+  dueInfo,
   fileKey,
   formatBytes,
   importableType,
@@ -10,15 +13,16 @@ import {
   type HomeworkItem,
 } from '@study/core';
 import { Check, Download, FileText, RefreshCw } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { formatDateShort } from '../lib/format';
+import { formatAgendaDay, formatDateShort } from '../lib/format';
 import { useLanisAuto } from '../lib/lanisAuto';
 import { setPendingUpload } from '../lib/lanisFiles';
 import { useStore } from '../state/store';
 
 const FILES_DAYS = 30; // so weit zurück zeigt die Liste der Arbeitsblätter zuerst
-const HOMEWORK_DAYS = 14;
+const HOMEWORK_DAYS = 21; // Hausaufgaben bleiben so lange sichtbar
+const RECENT_DAYS = 3; // ohne Aufgabe in der App nur, wenn die Abgabe höchstens so lange her ist
 
 const ago = (iso: string | null) => {
   if (!iso) return 'noch nie';
@@ -29,15 +33,11 @@ const ago = (iso: string | null) => {
   return h < 24 ? `vor ${h} h` : `vor ${Math.round(h / 24)} Tagen`;
 };
 
-/** Hausaufgaben und Arbeitsblätter aus den Kursmappen in Lanis (Bereich Notizen, Reiter Hausaufgaben). */
-export function Homework() {
+/** Gemeinsame Daten der beiden Seiten (Hausaufgaben, Arbeitsblätter). */
+function useHomework() {
   const { state, dispatch } = useStore();
   const auto = useLanisAuto();
-  const navigate = useNavigate();
   const today = toIsoDate(new Date());
-  const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [showOlder, setShowOlder] = useState(false);
 
   // Noch nie geladen (zum Beispiel gerade erst mit Lanis verbunden): einmal beim Öffnen der Seite holen
   const asked = useRef(false);
@@ -50,12 +50,176 @@ export function Homework() {
   const items = state.homework?.items ?? [];
   const subjectOf = (item: HomeworkItem) => state.subjects.find((s) => s.id === subjectForCourse(item.course, state.subjects)) ?? null;
   const taskFor = (item: HomeworkItem) => state.tasks.find((t) => t.externalId === item.key);
-  const taken = useMemo(() => new Set(state.notes.flatMap((n) => n.lanisKeys)), [state.notes]);
+  /** Abgabetag: der der Aufgabe in der App, sonst berechnet aus dem Stundenplan */
+  const dueOf = (item: HomeworkItem) => taskFor(item)?.date ?? dueDateFor(item.date, subjectForCourse(item.course, state.subjects), state.timetable, state.subjects);
+  return { state, dispatch, auto, today, items, subjectOf, taskFor, dueOf };
+}
 
-  const homeworkCut = addDays(today, -HOMEWORK_DAYS);
-  const homework = items.filter((i) => i.text && i.date >= homeworkCut);
-  const open = homework.filter((i) => !(taskFor(i)?.done ?? i.done));
-  const finished = homework.filter((i) => taskFor(i)?.done ?? i.done);
+function Header({ title, sub, auto, stand }: { title: string; sub: string; auto: ReturnType<typeof useLanisAuto>; stand: string | null }) {
+  return (
+    <>
+      <div className="page-head">
+        <div>
+          <h1>{title}</h1>
+          <p className="sub">
+            {sub} Stand: {ago(stand)}.
+          </p>
+        </div>
+        {auto.enabled && (
+          <button type="button" className="btn" disabled={auto.busy} onClick={() => void auto.refresh(true)}>
+            <RefreshCw size={18} aria-hidden="true" /> {auto.busy ? 'Aktualisiere …' : 'Jetzt aktualisieren'}
+          </button>
+        )}
+      </div>
+
+      {!auto.enabled && (
+        <div className="card stack">
+          <h2>Mit Lanis verbinden</h2>
+          <p className="muted">
+            Damit die App Hausaufgaben und Arbeitsblätter aus Lanis holen kann, muss die automatische Aktualisierung an sein (beim Import „Auf diesem Gerät merken“ wählen). Dein Passwort bleibt verschlüsselt auf diesem Gerät.
+          </p>
+          <div>
+            <Link className="btn btn-primary" to="/import">
+              Lanis verbinden
+            </Link>
+          </div>
+        </div>
+      )}
+      {auto.error && (
+        <p className="notice" role="alert">
+          {auto.error}
+        </p>
+      )}
+    </>
+  );
+}
+
+/** Hausaufgaben aus den Kursmappen in Lanis, nach Abgabetag geordnet. */
+export function Homework() {
+  const { state, dispatch, auto, today, items, subjectOf, taskFor, dueOf } = useHomework();
+
+  const cut = addDays(today, -HOMEWORK_DAYS);
+  const all = items.filter((i) => i.text && i.date >= cut);
+  const isDone = (i: HomeworkItem) => taskFor(i)?.done ?? i.done;
+  // Offen: alles mit Aufgabe in der App, ohne Aufgabe nur, wenn die Abgabe noch nicht lange her ist
+  const open = all
+    .filter((i) => !isDone(i) && (taskFor(i) || dueOf(i) >= addDays(today, -RECENT_DAYS)))
+    .map((i) => ({ item: i, due: dueOf(i) }))
+    .sort((a, b) => a.due.localeCompare(b.due) || a.item.course.localeCompare(b.item.course));
+  const finished = all.filter(isDone).sort((a, b) => b.date.localeCompare(a.date));
+
+  const groups: { key: string; kind: ReturnType<typeof dueGroup>; due: string; rows: typeof open }[] = [];
+  for (const row of open) {
+    const kind = dueGroup(row.due, today);
+    const key = kind === 'day' ? row.due : kind;
+    const last = groups[groups.length - 1];
+    if (last && last.key === key) last.rows.push(row);
+    else groups.push({ key, kind, due: row.due, rows: [row] });
+  }
+  const groupTitle = (g: (typeof groups)[number]) => (g.kind === 'late' ? 'Überfällig' : g.kind === 'today' ? 'Heute' : g.kind === 'tomorrow' ? 'Morgen' : formatAgendaDay(g.due, today));
+
+  const lateCount = open.filter((r) => r.due < today).length;
+  const todayCount = open.filter((r) => r.due === today).length;
+
+  const card = (item: HomeworkItem, due: string, done: boolean) => {
+    const task = taskFor(item);
+    const subject = subjectOf(item);
+    const info = dueInfo(due, today);
+    return (
+      <div key={item.key} className={`card hw-card${done ? ' is-done' : ''}`} style={{ '--subject': subject?.color ?? 'var(--accent)' } as CSSProperties}>
+        {task ? (
+          <button type="button" className="check" role="checkbox" aria-checked={done} aria-label={`Hausaufgabe ${subject?.name ?? item.course} erledigt`} onClick={() => dispatch({ type: 'toggleTask', id: task.id })}>
+            {done && <Check size={14} aria-hidden="true" />}
+          </button>
+        ) : (
+          <span className="check" aria-hidden="true" style={{ opacity: 0.4 }}>
+            {done && <Check size={14} />}
+          </span>
+        )}
+        <div className="hw-body">
+          <div className="hw-head">
+            <strong className="hw-subject">{subject?.name ?? item.course}</strong>
+            {!done && <span className={`due ${info.tone}`}>{info.label}</span>}
+          </div>
+          <span className="hw-meta">
+            {done ? '' : `Fällig ${formatDateShort(due)} · `}Eintrag vom {formatDateShort(item.date)}
+            {item.slot ? `, ${item.slot}` : ''}
+            {item.topic ? ` · ${item.topic}` : ''}
+          </span>
+          <span className={`hw-text${done ? ' done-text' : ''}`}>{item.text}</span>
+          {item.done && <span className="hw-meta">In Lanis als erledigt markiert.</span>}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="stack" style={{ gap: 20 }}>
+      <Header title="Hausaufgaben" sub="Aus deinen Kursmappen in Lanis, nach Abgabetag geordnet." auto={auto} stand={state.homeworkAt} />
+
+      {auto.enabled && !state.homework && !auto.busy && (
+        <p className="notice" role="status">
+          Noch nichts geladen. Tippe auf „Jetzt aktualisieren“, dann liest die App deine Kursmappen.
+        </p>
+      )}
+
+      {state.homework && (
+        <>
+          <div className="hw-summary">
+            <div className="hw-stat">
+              <strong>{open.length}</strong>
+              <span>offen</span>
+            </div>
+            <div className={`hw-stat${lateCount > 0 ? ' late' : ''}`}>
+              <strong>{lateCount}</strong>
+              <span>überfällig</span>
+            </div>
+            <div className={`hw-stat${todayCount > 0 ? ' today' : ''}`}>
+              <strong>{todayCount}</strong>
+              <span>heute fällig</span>
+            </div>
+          </div>
+
+          {groups.length === 0 ? (
+            <div className="card stack" style={{ alignItems: 'center', textAlign: 'center' }}>
+              <h2>Alles erledigt</h2>
+              <p className="muted">Keine offenen Hausaufgaben. Neue legt die App auch als Aufgaben auf Heute an.</p>
+            </div>
+          ) : (
+            groups.map((g) => (
+              <section key={g.key} className="hw-group" aria-label={groupTitle(g)}>
+                <h2 className={`hw-group-title ${g.kind}`}>
+                  {groupTitle(g)} <span className="hw-count">{g.rows.length}</span>
+                </h2>
+                {g.rows.map((r) => card(r.item, r.due, false))}
+              </section>
+            ))
+          )}
+
+          {finished.length > 0 && (
+            <details className="hw-group">
+              <summary className="hw-group-title" style={{ cursor: 'pointer' }}>
+                Erledigt <span className="hw-count">{finished.length}</span>
+              </summary>
+              <div className="hw-group" style={{ marginTop: 10 }}>
+                {finished.map((i) => card(i, dueOf(i), true))}
+              </div>
+            </details>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+/** Arbeitsblätter und Anhänge der Lehrkräfte aus Lanis, direkt als Notiz übernehmbar. */
+export function Worksheets() {
+  const { state, auto, today, items, subjectOf } = useHomework();
+  const navigate = useNavigate();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [showOlder, setShowOlder] = useState(false);
+  const taken = useMemo(() => new Set(state.notes.flatMap((n) => n.lanisKeys)), [state.notes]);
 
   const filesCut = addDays(today, -FILES_DAYS);
   const withFiles = items.filter((i) => i.files.length > 0);
@@ -107,58 +271,21 @@ export function Homework() {
     }
   };
 
-  const homeworkRow = (item: HomeworkItem) => {
-    const task = taskFor(item);
-    const done = task?.done ?? item.done;
-    const subject = subjectOf(item);
-    return (
-      <div key={item.key} className="task" style={{ alignItems: 'flex-start' }}>
-        {task ? (
-          <button type="button" className="check" role="checkbox" aria-checked={done} aria-label={`Hausaufgabe ${subject?.name ?? item.course} erledigt`} onClick={() => dispatch({ type: 'toggleTask', id: task.id })}>
-            {done && <Check size={14} aria-hidden="true" />}
-          </button>
-        ) : (
-          <span className="check" aria-hidden="true" style={{ opacity: 0.4 }}>
-            {done && <Check size={14} />}
-          </span>
-        )}
-        <div style={{ flex: 1, minWidth: 0 }} className="stack">
-          <div className="between" style={{ gap: 8, flexWrap: 'wrap' }}>
-            <strong>{subject?.name ?? item.course}</strong>
-            <span className="hint">
-              {formatDateShort(item.date)}
-              {item.slot ? ` · ${item.slot}` : ''}
-              {task ? ` · fällig ${formatDateShort(task.date)}` : ''}
-            </span>
-          </div>
-          {item.topic && <span className="hint">{item.topic}</span>}
-          <span className={done ? 'done-text' : ''} style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
-            {item.text}
-          </span>
-          {item.done && <span className="hint">In Lanis als erledigt markiert.</span>}
-        </div>
-      </div>
-    );
-  };
-
   const fileRow = (item: HomeworkItem, file: HomeworkFile) => {
     const type = importableType(file);
-    const key = fileKey(item, file);
-    const isTaken = taken.has(key);
+    const isTaken = taken.has(fileKey(item, file));
     const id = `${item.key}:${file.name}`;
     return (
-      <li key={file.name} className="between" style={{ gap: 8, flexWrap: 'wrap' }}>
-        <span style={{ display: 'flex', gap: 8, alignItems: 'center', minWidth: 0, flex: 1 }}>
-          <FileText size={18} aria-hidden="true" style={{ flexShrink: 0 }} />
-          <span style={{ overflowWrap: 'anywhere' }}>
-            {file.name} {file.size > 0 && <span className="hint">({formatBytes(file.size)})</span>}
-          </span>
+      <li key={file.name} className="ws-file">
+        <FileText size={18} aria-hidden="true" style={{ flexShrink: 0 }} />
+        <span className="ws-name">
+          {file.name} {file.size > 0 && <span className="hint">({formatBytes(file.size)})</span>}
         </span>
         {isTaken ? (
           <span className="tag">in Notizen</span>
         ) : type ? (
           <button type="button" className="btn" disabled={busy !== null || !auto.enabled} onClick={() => void intoNotes(item, [file])}>
-            {busy === `${item.key}:${file.name}` ? 'Lade …' : 'In Notizen übernehmen'}
+            {busy === id ? 'Lade …' : 'In Notizen übernehmen'}
           </button>
         ) : (
           <button type="button" className="btn btn-ghost" disabled={busy !== null || !auto.enabled} onClick={() => void save(item, file)} aria-label={`${file.name} herunterladen`}>
@@ -173,111 +300,50 @@ export function Homework() {
     const subject = subjectOf(item);
     const importable = item.files.filter((f) => importableType(f) !== null && !taken.has(fileKey(item, f)));
     return (
-      <div key={item.key} className="card stack" style={{ gap: 10 }}>
-        <div className="between" style={{ gap: 8, flexWrap: 'wrap' }}>
-          <strong>{subject?.name ?? item.course}</strong>
-          <span className="hint">
-            {formatDateShort(item.date)}
-            {item.slot ? ` · ${item.slot}` : ''}
-          </span>
-        </div>
-        {item.topic && <span className="muted">{item.topic}</span>}
-        <ul className="stack" style={{ gap: 8, listStyle: 'none', margin: 0, padding: 0 }}>
-          {item.files.map((f) => fileRow(item, f))}
-        </ul>
-        {importable.length > 1 && (
-          <div>
-            <button type="button" className="btn btn-primary" disabled={busy !== null || !auto.enabled} onClick={() => void intoNotes(item, importable)}>
-              {busy === `${item.key}:${importable.map((f) => f.name).join('|')}` ? 'Lade …' : `Alle ${importable.length} in einer Notiz übernehmen`}
-            </button>
+      <div key={item.key} className="card hw-card" style={{ '--subject': subject?.color ?? 'var(--accent)' } as CSSProperties}>
+        <div className="hw-body">
+          <div className="hw-head">
+            <strong className="hw-subject">{subject?.name ?? item.course}</strong>
+            <span className="hw-meta">
+              {formatDateShort(item.date)}
+              {item.slot ? ` · ${item.slot}` : ''}
+            </span>
           </div>
-        )}
+          {item.topic && <span className="hw-meta">{item.topic}</span>}
+          <ul className="ws-files">{item.files.map((f) => fileRow(item, f))}</ul>
+          {importable.length > 1 && (
+            <div>
+              <button type="button" className="btn btn-primary" disabled={busy !== null || !auto.enabled} onClick={() => void intoNotes(item, importable)}>
+                {busy === `${item.key}:${importable.map((f) => f.name).join('|')}` ? 'Lade …' : `Alle ${importable.length} in einer Notiz übernehmen`}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     );
   };
 
   return (
     <div className="stack" style={{ gap: 20 }}>
-      <div className="page-head">
-        <div>
-          <h1>Hausaufgaben</h1>
-          <p className="sub">Hausaufgaben und Arbeitsblätter aus deinen Kursmappen in Lanis. Stand: {ago(state.homeworkAt)}.</p>
-        </div>
-        {auto.enabled && (
-          <button type="button" className="btn" disabled={auto.busy} onClick={() => void auto.refresh(true)}>
-            <RefreshCw size={18} aria-hidden="true" /> {auto.busy ? 'Aktualisiere …' : 'Jetzt aktualisieren'}
-          </button>
-        )}
-      </div>
-
-      {!auto.enabled && (
-        <div className="card stack">
-          <h2>Mit Lanis verbinden</h2>
-          <p className="muted">
-            Damit die App Hausaufgaben und Arbeitsblätter aus Lanis holen kann, muss die automatische Aktualisierung an sein (beim Import „Auf diesem Gerät merken“ wählen). Dein Passwort bleibt verschlüsselt auf diesem Gerät.
-          </p>
-          <div>
-            <Link className="btn btn-primary" to="/import">
-              Lanis verbinden
-            </Link>
-          </div>
-        </div>
-      )}
-
-      {auto.error && (
-        <p className="notice" role="alert">
-          {auto.error}
-        </p>
-      )}
+      <Header title="Arbeitsblätter" sub="Anhänge deiner Lehrkräfte aus Lanis." auto={auto} stand={state.homeworkAt} />
       {error && (
         <p className="notice" role="alert">
           {error}
         </p>
       )}
-
-      {auto.enabled && !state.homework && !auto.busy && (
-        <p className="notice" role="status">
-          Noch nichts geladen. Tippe auf „Jetzt aktualisieren“, dann liest die App deine Kursmappen.
-        </p>
-      )}
-
       {state.homework && (
         <>
-          <section className="stack" aria-labelledby="hw-open">
-            <div className="between">
-              <h2 id="hw-open">Offen</h2>
-              <span className="tag">{open.length}</span>
+          <p className="hint">
+            „In Notizen übernehmen“ lädt die Datei direkt aus Lanis und führt dich durch das gewohnte Hochladen (Seiten prüfen, bestätigen). PDFs und Fotos gehen in Notizen, anderes (zum Beispiel PowerPoint) kannst du herunterladen.
+          </p>
+          {shownFiles.length === 0 ? <p className="hint">Keine Anhänge in den letzten {FILES_DAYS} Tagen.</p> : shownFiles.map(filesCard)}
+          {!showOlder && withFiles.length > recentFiles.length && (
+            <div>
+              <button type="button" className="btn btn-ghost" onClick={() => setShowOlder(true)}>
+                Ältere zeigen ({withFiles.length - recentFiles.length})
+              </button>
             </div>
-            {open.length === 0 ? (
-              <p className="hint">Keine offenen Hausaufgaben aus den letzten {HOMEWORK_DAYS} Tagen. Neue Hausaufgaben legt die App auch als Aufgaben auf Heute an.</p>
-            ) : (
-              <div className="card stack">{open.map(homeworkRow)}</div>
-            )}
-            {finished.length > 0 && (
-              <details className="card stack">
-                <summary style={{ cursor: 'pointer' }}>Erledigt ({finished.length})</summary>
-                <div className="stack">{finished.map(homeworkRow)}</div>
-              </details>
-            )}
-          </section>
-
-          <section className="stack" aria-labelledby="hw-files">
-            <div className="between">
-              <h2 id="hw-files">Arbeitsblätter und Anhänge</h2>
-              <span className="tag">{shownFiles.length}</span>
-            </div>
-            <p className="hint">
-              „In Notizen übernehmen“ lädt die Datei direkt aus Lanis und führt dich durch das gewohnte Hochladen (Seiten prüfen, bestätigen). PDFs und Fotos gehen in Notizen, anderes (zum Beispiel PowerPoint) kannst du herunterladen.
-            </p>
-            {shownFiles.length === 0 ? <p className="hint">Keine Anhänge in den letzten {FILES_DAYS} Tagen.</p> : shownFiles.map(filesCard)}
-            {!showOlder && withFiles.length > recentFiles.length && (
-              <div>
-                <button type="button" className="btn btn-ghost" onClick={() => setShowOlder(true)}>
-                  Ältere zeigen ({withFiles.length - recentFiles.length})
-                </button>
-              </div>
-            )}
-          </section>
+          )}
         </>
       )}
     </div>

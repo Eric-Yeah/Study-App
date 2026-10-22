@@ -127,7 +127,9 @@ export function SchoolDay() {
                       {substitutions.map((s, i) => (
                         <span key={i} className="sch-sub">
                           <SubTag s={s} />
-                          {s.note && <span className="hint">{s.note}</span>}
+                          {(s.note ?? (s.kind === 'cancelled' && s.art && !/entfall|ausfall|entfällt/i.test(s.art) ? s.art : null)) && (
+                            <span className="hint">{s.note ?? s.art}</span>
+                          )}
                         </span>
                       ))}
                     </div>

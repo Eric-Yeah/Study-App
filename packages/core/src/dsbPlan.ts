@@ -37,7 +37,7 @@ const plainText = (html: string) =>
  * (mindestens zwei Zeichen, damit "E" nicht zu "Ethik" passt).
  */
 export function subjectMatchesAbbr(name: string, abbr: string): boolean {
-  const token = name.trim().toLowerCase().split(/[\s\-_/.]+/)[0].replace(/\d+$/, '');
+  const token = name.trim().replace(/^(?:Q[1-4]|E\d)(?=[A-Za-zÄÖÜäöü])/i, '').toLowerCase().split(/[\s\-_/.]+/)[0].replace(/\d+$/, '');
   const a = abbr.toLowerCase();
   if (!token || !a) return false;
   if (token === a) return true;
@@ -83,7 +83,34 @@ export function dsbField(header: string): Field | null {
 
 const empty = (v: string) => v === '' || /^[-–—.]+$/.test(v);
 
-/** Alle Einträge einer HTML-Seite im Untis-Aufbau. Seiten ohne erkennbare Tabelle ergeben eine leere Liste. */
+/** Durchgestrichener Inhalt (Untis streicht die alten Werte durch): <s>, <strike>, <del> oder line-through. */
+const isStruck = (cellHtml: string) => /<(s|strike|del)\b|line-through/i.test(cellHtml);
+
+const PERIODS = /^\d{1,2}(\s*[-–]\s*\d{1,2})?$/;
+
+/** Zeile ohne Spaltenüberschrift: Stunde suchen, davor die Art, danach Lehrer, Fach, Raum, Text (so wie im Untis-Gruppenplan). */
+function inferFields(texts: string[]): (Field | null)[] {
+  const fields: (Field | null)[] = texts.map(() => null);
+  const p = texts.findIndex((t) => PERIODS.test(t));
+  if (p < 0) return fields;
+  fields[p] = 'periods';
+  if (p >= 1) fields[p - 1] = 'art';
+  if (p >= 2) fields[p - 2] = 'klass';
+  (['teacher', 'subject', 'room', 'note'] as Field[]).forEach((f, i) => {
+    if (p + 1 + i < fields.length) fields[p + 1 + i] = f;
+  });
+  return fields;
+}
+
+/** "Q1 Q1" (Zwischenüberschrift, doppelt geschrieben) -> "Q1" */
+const groupName = (t: string) => [...new Set(t.split(/\s+/).filter(Boolean))].join(' ');
+
+/**
+ * Alle Einträge einer HTML-Seite im Untis-Aufbau. Zwei Varianten:
+ * - mit Spalte "Klasse(n)" und Kopfzeile (Überschriften bestimmen die Spalten)
+ * - nach Klassen gruppiert: Zwischenzeilen wie "Q1 Q1" über den Einträgen, alte Werte durchgestrichen, Kopfzeile fehlt oder ist unbekannt
+ * Seiten ohne erkennbare Tabelle ergeben eine leere Liste.
+ */
 export function parseUntisPlan(html: string, year = new Date().getFullYear()): DsbEntry[] {
   const titles = [...html.matchAll(/<div\b[^>]*class="[^"]*\bmon_title\b[^"]*"[^>]*>([\s\S]*?)<\/div>/gi)].map((m) => ({
     at: m.index ?? 0,
@@ -94,17 +121,31 @@ export function parseUntisPlan(html: string, year = new Date().getFullYear()): D
     const at = table.index ?? 0;
     const date = [...titles].reverse().find((t) => t.at < at)?.date ?? null;
     if (!date) continue;
-    const rows = [...table[1].matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)].map((r) => r[1]);
-    const headIdx = rows.findIndex((r) => /<th\b/i.test(r));
-    if (headIdx < 0) continue;
-    const fields = [...rows[headIdx].matchAll(/<th\b[^>]*>([\s\S]*?)<\/th>/gi)].map((m) => dsbField(m[1]));
-    if (!fields.includes('periods')) continue;
-    for (const row of rows.slice(headIdx + 1)) {
-      const cells = [...row.matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/gi)].map((m) => plainText(m[1]));
-      if (cells.length < 2) continue; // "Keine Vertretungen" und ähnliche Zeilen
+    let fields: (Field | null)[] | null = null;
+    let group: string | null = null;
+    for (const row of table[1].matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)) {
+      const ths = [...row[1].matchAll(/<th\b[^>]*>([\s\S]*?)<\/th>/gi)];
+      if (ths.length > 0) {
+        const f = ths.map((m) => dsbField(m[1]));
+        if (f.includes('periods')) fields = f;
+        continue;
+      }
+      const tds = [...row[1].matchAll(/<td\b([^>]*)>([\s\S]*?)<\/td>/gi)];
+      if (tds.length === 0) continue;
+      const texts = tds.map((m) => plainText(m[2]));
+      // Zwischenzeile mit dem Namen der Klasse
+      if (tds.length === 1 || (tds.length <= 2 && /colspan|inline_header/i.test(tds[0][1]))) {
+        const name = texts.find(Boolean);
+        if (name) group = groupName(name);
+        continue;
+      }
+      const cols = fields ?? inferFields(texts);
       const v: Partial<Record<Field, string>> = {};
-      fields.forEach((f, i) => {
-        if (f && i < cells.length && !empty(cells[i]) && v[f] === undefined) v[f] = cells[i];
+      cols.forEach((f, i) => {
+        if (!f || i >= texts.length || empty(texts[i])) return;
+        // Durchgestrichen heißt: das war vorher so (altes Fach, alter Raum)
+        const key: Field = isStruck(tds[i][2]) ? (f === 'subject' ? 'subjectOld' : f === 'room' ? 'roomOld' : f) : f;
+        if (v[key] === undefined) v[key] = texts[i];
       });
       const periods = parsePeriods(v.periods ?? '');
       if (periods.length === 0) continue;
@@ -118,7 +159,7 @@ export function parseUntisPlan(html: string, year = new Date().getFullYear()): D
         subjectOld: v.subjectOld ?? null,
         teacher: v.teacher ?? null,
         group: null,
-        klass: v.klass ?? null,
+        klass: v.klass ?? group,
         source: 'dsb',
         ...base,
       });

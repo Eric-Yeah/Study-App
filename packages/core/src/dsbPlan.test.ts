@@ -118,3 +118,44 @@ describe('DSBmobile: Fehlersuche', () => {
     expect(dsbSample(['<p>nichts</p>'])).toBe('');
   });
 });
+
+describe('DSBmobile: nach Klassen gruppierter Plan mit durchgestrichenen Werten', () => {
+  const cell = (c: string, t: string) => `<div class="stunde"><b>${c}</b> R1 <br /><small>${t}</small></div>`;
+  const label = (n: number, from: string, to: string) => `<td><span><small>${from} - ${to}</small></span><span> ${n}. </span></td>`;
+  const none = '<td>&nbsp;</td>';
+  // Donnerstag: 5. Stunde Geschichte bei Lor, 3. und 4. Stunde Mathe bei Xyz
+  const tt = parseTimetable(
+    `<h2>Persönlicher Stundenplan</h2> gültig ab 01.08.2026 <table><thead><tr><th>Stunde</th><th>Mo</th><th>Di</th><th>Mi</th><th>Do</th><th>Fr</th></tr></thead><tbody>
+<tr>${label(3, '09:55', '10:40')}${none}${none}${none}<td rowspan="2">${cell('Q1M03', 'Xyz')}</td>${none}</tr>
+<tr>${label(4, '10:40', '11:25')}${none}${none}${none}${none}</tr>
+<tr>${label(5, '11:45', '12:30')}${none}${none}${none}<td>${cell('Q1G05', 'Lor')}</td>${none}</tr></tbody></table>`,
+  );
+  const st = (x: string) => `<td class="list"><s>${x}</s></td>`;
+  const row = (art: string, periods: string, teacher: string, subject: string) =>
+    `<tr class="list odd"><td class="list">${art}</td><td class="list">${periods}</td>${st(teacher)}${st(subject)}<td class="list">---</td><td class="list">&nbsp;</td></tr>`;
+  const body = `<tr class="list"><td class="list inline_header" colspan="6">Q1 Q1</td></tr>
+${row('Eigenverantwortliches Arbeiten', '1 - 2', 'Reu', 'POWI')}${row('Eigenverantwortliches Arbeiten', '5', 'Lor', 'G')}${row('Eigenverantwortliches Arbeiten', '6', 'Saa', 'Q1INFO_LK01')}
+<tr class="list"><td class="list inline_header" colspan="6">Q3 Q3</td></tr>
+${row('Eigenverantwortliches Arbeiten', '3 - 4', 'Nör', 'D')}`;
+  const head = '<tr class="list"><th>Art</th><th>Stunde</th><th>(Lehrer)</th><th>(Fach)</th><th>Raum</th><th>Text</th></tr>';
+  const page = (withHead: boolean) => `<div class="mon_title">22.10.2026 Donnerstag</div><table class="mon_list">${withHead ? head : ''}${body}</table>`;
+
+  for (const withHead of [true, false]) {
+    it(`liest Klasse aus der Zwischenzeile und alte Werte (${withHead ? 'mit' : 'ohne'} Kopfzeile)`, () => {
+      const list = parseUntisPlan(page(withHead), 2026);
+      expect(list).toHaveLength(4);
+      expect(list[0]).toMatchObject({ periods: [1, 2], klass: 'Q1', kind: 'cancelled', subject: null, subjectOld: 'POWI', teacher: 'Reu', room: null });
+      expect(list.find((e) => e.periods[0] === 3)).toMatchObject({ klass: 'Q3', subjectOld: 'D' });
+    });
+
+    it(`zeigt dir nur den Entfall in Geschichte bei Lor (${withHead ? 'mit' : 'ohne'} Kopfzeile)`, () => {
+      const mine = forStudent(parseUntisPlan(page(withHead), 2026), tt);
+      expect(mine.map((e) => [e.periods[0], e.subjectOld, e.kind])).toEqual([[5, 'G', 'cancelled']]);
+    });
+  }
+
+  it('Kurscode als Fach passt zum Fachkürzel', () => {
+    expect(subjectMatchesAbbr('Q1INFO_LK01', 'INFO')).toBe(true);
+    expect(subjectMatchesAbbr('Q1INFO_LK01', 'M')).toBe(false);
+  });
+});

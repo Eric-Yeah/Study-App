@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { classMatches, dsbField, dsbTitleDate, forStudent, ownLevels, parseUntisPlan, subjectMatchesAbbr } from './dsbPlan';
-import { parseTimetable } from './lanisPlans';
+import { classMatches, dsbField, dsbTitleDate, forStudent, ownLevels, parseUntisPlan, splitStruck } from './dsbPlan';
+import { dayView, parseTimetable, subjectMatchesAbbr, type Timetable } from './lanisPlans';
 
 // Erfundener Plan im Aufbau von Untis (subst_001.htm), zwei Tage und eine Seite zweimal.
 const rows = (day: string) =>
@@ -157,5 +157,126 @@ ${row('Eigenverantwortliches Arbeiten', '3 - 4', 'Nör', 'D')}`;
   it('Kurscode als Fach passt zum Fachkürzel', () => {
     expect(subjectMatchesAbbr('Q1INFO_LK01', 'INFO')).toBe(true);
     expect(subjectMatchesAbbr('Q1INFO_LK01', 'M')).toBe(false);
+  });
+});
+
+describe('DSBmobile: Lehrkraft und Kurscode abgleichen (Aufbau wie im echten Plan, Namen erfunden)', () => {
+  const lesson = (weekday: number, period: number, span: number, course: string, abbr: string, teacher: string) => ({
+    weekday,
+    period,
+    span,
+    start: '08:00',
+    end: '09:35',
+    course,
+    abbr,
+    isAdvanced: false,
+    room: 'R1',
+    teacher,
+  });
+  // Donnerstag (weekday 3): 1.-2. POWI bei Abc (Doppelstunde), 3. Mathe bei Xyz, 5. Geschichte bei Lmn, 6. Info bei Qrs
+  const tt: Timetable = {
+    validFrom: '2026-10-02',
+    periods: [],
+    lessons: [
+      lesson(3, 1, 2, 'Q1POWI_LK01', 'POWI', 'Abc'),
+      lesson(3, 3, 1, 'Q1M03', 'M', 'Xyz'),
+      lesson(3, 5, 1, 'Q1G05', 'G', 'Lmn'),
+      lesson(3, 6, 1, 'Q1INFO_LK01', 'INFO', 'Qrs'),
+    ],
+  };
+  const cell = (inner: string) => `<td class="list" align="center">${inner}</td>`;
+  const row = (art: string, periods: string, teacher: string, subject: string, room = '---') =>
+    `<tr class="list odd">${cell(art)}${cell(periods)}${cell(teacher)}${cell(subject)}${cell(room)}${cell('&nbsp;')}</tr>`;
+  const plan = (rowsHtml: string, klass = 'Q1') =>
+    `<div class="mon_title">22.10.2026 Donnerstag (Seite 1 / 3)</div><table class="mon_list"><tr class="list"><th>Art</th><th>Stunde</th><th>Vertreter</th><th>Fach</th><th>Raum</th><th>Text</th></tr>` +
+    `<tr class="list"><td class="list inline_header" colspan="6">${klass}  ${klass}</td></tr>${rowsHtml}</table>`;
+  const keep = (rowsHtml: string, klass?: string) => forStudent(parseUntisPlan(plan(rowsHtml, klass), 2026), tt);
+  const ENTFALL = 'Eigenverantwortliches Arbeiten';
+
+  it('liest die alte Lehrkraft aus der durchgestrichenen Spalte "Vertreter" und den Vertreter dahinter', () => {
+    expect(splitStruck('<s>Ker</s>?maa')).toEqual({ old: 'Ker', now: 'maa' });
+    expect(splitStruck('<span style="color: #000080"><s>C104</s>→C008</span>')).toEqual({ old: 'C104', now: 'C008' });
+    expect(splitStruck('<s>Pet</s>')).toEqual({ old: 'Pet', now: '' });
+    expect(splitStruck('Cyb')).toEqual({ old: '', now: 'Cyb' });
+    const [e] = parseUntisPlan(plan(row('Vertretung', '3', '<s>Xyz</s>?Def', 'M', '<s>C010</s>?A107')), 2026);
+    expect(e).toMatchObject({ kind: 'substitute', teacher: 'Xyz', substitute: 'Def', subject: 'M', subjectOld: null, room: 'A107', roomOld: 'C010' });
+    const [gone] = parseUntisPlan(plan(row(ENTFALL, '5', '<s>Lmn</s>', '<s>G</s>')), 2026);
+    expect(gone).toMatchObject({ kind: 'cancelled', teacher: 'Lmn', substitute: null, subject: null, subjectOld: 'G' });
+    const [moved] = parseUntisPlan(plan(row('Raum-Vtr.', '3', 'Xyz', 'M', '<s>C010</s>?A107')), 2026);
+    expect(moved).toMatchObject({ kind: 'room', teacher: 'Xyz', substitute: null, room: 'A107', roomOld: 'C010' });
+    const [swap] = parseUntisPlan(plan(row('Tausch', '3', '<s>Xyz</s>?Def', '<s>M</s>?E')), 2026);
+    expect(swap).toMatchObject({ subject: 'E', subjectOld: 'M', teacher: 'Xyz', substitute: 'Def' });
+  });
+
+  it('gleiches Fach, andere Lehrkraft: verworfen', () => {
+    // POWI von Reu fällt aus, aber mein POWI-Kurs hat Abc
+    expect(keep(row(ENTFALL, '1 - 2', '<s>Reu</s>', '<s>POWI</s>'))).toEqual([]);
+    expect(keep(row('Vertretung', '1 - 2', '<s>Reu</s>?Def', 'POWI'))).toEqual([]);
+  });
+
+  it('gleiches Fach, gleiche Lehrkraft: behalten (auch ohne Groß- und Kleinschreibung)', () => {
+    expect(keep(row(ENTFALL, '5', '<s>Lmn</s>', '<s>G</s>')).map((e) => e.periods)).toEqual([[5]]);
+    expect(keep(row(ENTFALL, '5', '<s>LMN</s>', '<s>G</s>')).map((e) => e.periods)).toEqual([[5]]);
+    expect(keep(row('Vertretung', '3', '<s>xyz</s>?Def', 'M')).map((e) => e.substitute)).toEqual(['Def']);
+  });
+
+  it('Kurscode im Plan gleich meinem Kurscode: behalten, anderer Kurscode desselben Fachs: verworfen', () => {
+    expect(keep(row(ENTFALL, '6', '<s>Nop</s>', '<s>Q1INFO_LK01</s>')).map((e) => e.periods)).toEqual([[6]]); // Kurs gleich, Lehrkraft egal
+    expect(keep(row(ENTFALL, '6', '<s>Nop</s>', '<s>Q1INFO_LK02</s>'))).toEqual([]);
+    expect(keep(row(ENTFALL, '6', '<s>Qrs</s>', '<s>Q1INFO_LK02</s>')).map((e) => e.periods)).toEqual([[6]]); // gleiche Lehrkraft zur gleichen Zeit
+    expect(keep(row(ENTFALL, '6', '', '<s>INFO</s>')).map((e) => e.periods)).toEqual([[6]]);
+  });
+
+  it('Lehrkraft unbekannt: das Fach entscheidet', () => {
+    expect(keep(row('Vertretung', '3', 'Def', 'M')).map((e) => e.periods)).toEqual([[3]]); // nur der Vertreter genannt
+    expect(keep(row('Vertretung', '3', 'Def', 'G'))).toEqual([]); // anderes Fach
+    expect(keep(row(ENTFALL, '5', '', '<s>G</s>')).map((e) => e.periods)).toEqual([[5]]);
+  });
+
+  it('Raumwechsel: die Lehrkraft in der Spalte "Vertreter" ist die bekannte', () => {
+    expect(keep(row('Raum-Vtr.', '3', 'Xyz', 'M', '<s>C010</s>?A107')).map((e) => [e.periods, e.room])).toEqual([[[3], 'A107']]);
+    expect(keep(row('Raum-Vtr.', '3', 'Def', 'M', '<s>C010</s>?A107'))).toEqual([]);
+  });
+
+  it('Doppelstunde: Stunde 1 - 2 trifft die Doppelstunde, auch wenn nur eine Stunde im Plan steht', () => {
+    expect(keep(row(ENTFALL, '1 - 2', '<s>Abc</s>', '<s>POWI</s>')).map((e) => e.periods)).toEqual([[1, 2]]);
+    expect(keep(row(ENTFALL, '2', '<s>Abc</s>', '<s>POWI</s>')).map((e) => e.periods)).toEqual([[2]]);
+    expect(keep(row(ENTFALL, '2 - 3', '<s>Abc</s>', '<s>POWI</s>')).map((e) => e.periods)).toEqual([[2, 3]]);
+  });
+
+  it('Eintrag ohne Fach: die Lehrkraft entscheidet, ohne beides die Zeit', () => {
+    expect(keep(row(ENTFALL, '3', '<s>Xyz</s>', '')).map((e) => e.periods)).toEqual([[3]]);
+    expect(keep(row(ENTFALL, '3', '<s>Def</s>', ''))).toEqual([]);
+    expect(keep(row(ENTFALL, '3', '', '')).map((e) => e.periods)).toEqual([[3]]);
+  });
+
+  it('Stunden ohne eigenen Kurs, andere Stufe und mehrere Klassen', () => {
+    expect(keep(row(ENTFALL, '4', '<s>Xyz</s>', '<s>M</s>'))).toEqual([]); // 4. Stunde habe ich frei
+    expect(keep(row(ENTFALL, '3', '<s>Xyz</s>', '<s>M</s>'), 'Q3')).toEqual([]);
+    expect(keep(row(ENTFALL, '3', '<s>Xyz</s>', '<s>M</s>'), 'Q1, Q2').map((e) => e.periods)).toEqual([[3]]);
+  });
+
+  it('Tausch: es reicht, wenn das alte oder das neue Fach zu meinem Kurs passt', () => {
+    expect(keep(row('Tausch', '3', '<s>Xyz</s>?Def', '<s>M</s>?E')).map((e) => e.subjectOld)).toEqual(['M']);
+    expect(keep(row('Tausch', '3', '<s>Ghi</s>?Def', '<s>M</s>?E'))).toEqual([]);
+  });
+
+  it('die Tagesansicht ordnet nach Kurs und Lehrkraft zu, nichts Fremdes bleibt unter "Weitere Änderungen"', () => {
+    const entries = parseUntisPlan(
+      plan(
+        row(ENTFALL, '1 - 2', '<s>Reu</s>', '<s>POWI</s>') +
+          row(ENTFALL, '5', '<s>Lmn</s>', '<s>G</s>') +
+          row(ENTFALL, '6', '<s>Nop</s>', '<s>Q1INFO_LK02</s>'),
+      ),
+      2026,
+    );
+    // alle drei ungefiltert: nur Geschichte gehört zu einer Stunde, POWI (Reu) und Info LK02 bleiben übrig
+    const raw = dayView(tt, entries, [], '2026-10-22');
+    expect(raw.lessons.filter((l) => l.substitutions.length > 0).map((l) => l.lesson.abbr)).toEqual(['G']);
+    expect(raw.unmatched.map((e) => e.subjectOld)).toEqual(['POWI', 'Q1INFO_LK02']);
+    // gefiltert (so ruft die App es auf): nichts bleibt übrig
+    const mine = dayView(tt, forStudent(entries, tt), [], '2026-10-22');
+    expect(mine.lessons.flatMap((l) => l.substitutions).map((e) => e.subjectOld)).toEqual(['G']);
+    expect(mine.unmatched).toEqual([]);
   });
 });

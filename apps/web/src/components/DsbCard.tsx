@@ -93,7 +93,7 @@ function DsbResult() {
         {d.dates.length > 0 ? ` (${d.dates.map((x) => x.slice(8) + '.' + x.slice(5, 7) + '.').join(', ')})` : ''}.{' '}
         <strong>{d.mine} davon für dich</strong>
         {d.total > 0 && d.mine < d.total
-          ? ` (nicht passend: ${d.dropped.klass} andere Klasse, ${d.dropped.lesson} keine Stunde von dir, ${d.dropped.subject} anderes Fach)`
+          ? ` (nicht passend: ${d.dropped.klass} andere Klasse, ${d.dropped.lesson} keine Stunde von dir, ${d.dropped.subject} anderes Fach oder andere Lehrkraft)`
           : ''}
         .
       </p>

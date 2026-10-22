@@ -12,6 +12,13 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '2026.10.22.7',
+    date: '22. Oktober 2026',
+    items: [
+      { icon: '🎯', title: 'Vertretungsplan: nur dein Kurs', text: 'Gibt es in deiner Stufe mehrere Kurse desselben Fachs, zeigt die App nur noch den Entfall oder die Vertretung deines Kurses. Sie vergleicht dazu die Lehrkraft (die durchgestrichene in der Spalte „Vertreter“) und den Kurscode, nicht nur das Fach. Ein Politik-und-Wirtschaft-Entfall bei einer anderen Lehrkraft taucht auf Heute nicht mehr auf.' },
+    ],
+  },
+  {
     version: '2026.10.22.6',
     date: '22. Oktober 2026',
     items: [

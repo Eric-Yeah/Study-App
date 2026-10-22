@@ -10,11 +10,10 @@
  * Reihenfolge). Eingeklammerte Überschriften wie "(Fach)", "(Raum)" und "(Lehrer)" sind die Werte VOR der Änderung.
  *
  * Der Plan gilt für die ganze Schule. forStudent behält nur, was zu den eigenen Stunden im Stundenplan passt.
- * Das Format ist nach Bibliotheken und Beispielen übernommen und noch nicht an dem Plan einer echten Schule geprüft.
+ * Aufbau und Abgleich sind am echten Plan einer Schule geprüft (Spalte "Vertreter" mit durchgestrichener alter Lehrkraft, Zwischenzeilen mit der Stufe).
  */
 
-import { LANIS_SUBJECT_NAMES } from './lanis';
-import { lessonsOn, parsePeriods, substitutionKind, type SubstitutionEntry, type Timetable } from './lanisPlans';
+import { lessonsOn, parsePeriods, substitutionFitsLesson, substitutionKind, type SubstitutionEntry, type Timetable } from './lanisPlans';
 
 const plainText = (html: string) =>
   html
@@ -30,21 +29,6 @@ const plainText = (html: string) =>
     .replace(/&szlig;/g, 'ß')
     .replace(/\s+/g, ' ')
     .trim();
-
-/**
- * Passt ein Fach aus dem Plan ("M", "Mathe", "M-GK1", "Bio") zum Fachkürzel einer Stunde ("M")?
- * Gleich, oder der Name ist ein bekannter Name des Kürzels (Mathe, Mathematik), oder einer der Namen beginnt mit dem anderen
- * (mindestens zwei Zeichen, damit "E" nicht zu "Ethik" passt).
- */
-export function subjectMatchesAbbr(name: string, abbr: string): boolean {
-  const token = name.trim().replace(/^(?:Q[1-4]|E\d)(?=[A-Za-zÄÖÜäöü])/i, '').toLowerCase().split(/[\s\-_/.]+/)[0].replace(/\d+$/, '');
-  const a = abbr.toLowerCase();
-  if (!token || !a) return false;
-  if (token === a) return true;
-  if (LANIS_SUBJECT_NAMES[a]?.some((n) => n.startsWith(token) || token.startsWith(n))) return token.length >= 2;
-  const [short, long] = token.length <= a.length ? [token, a] : [a, token];
-  return short.length >= 2 && long.startsWith(short);
-}
 
 export interface DsbEntry extends SubstitutionEntry {
   /** Klasse oder Stufe laut Plan, zum Beispiel "Q1" */
@@ -83,12 +67,28 @@ export function dsbField(header: string): Field | null {
 
 const empty = (v: string) => v === '' || /^[-–—.]+$/.test(v);
 
-/** Durchgestrichener Inhalt (Untis streicht die alten Werte durch): <s>, <strike>, <del> oder line-through. */
-const isStruck = (cellHtml: string) => /<(s|strike|del)\b|line-through/i.test(cellHtml);
+/**
+ * Untis streicht die alten Werte durch und schreibt den neuen dahinter: "<s>Ker</s>?maa" (das Zeichen dazwischen ist ein
+ * Pfeil, der im Zeichensatz der Seite als "?" ankommt). Ergibt den durchgestrichenen Teil (old) und den neuen Wert (now).
+ * Eine Zelle ganz mit line-through zählt als alter Wert ohne neuen.
+ */
+export function splitStruck(cellHtml: string): { old: string; now: string } {
+  const olds: string[] = [];
+  const rest = cellHtml.replace(/<(s|strike|del)\b[^>]*>([\s\S]*?)<\/\1>/gi, (_m, _t, inner: string) => {
+    olds.push(plainText(inner));
+    return ' ';
+  });
+  if (olds.length > 0) {
+    const now = plainText(rest).replace(/^[\s?→»›>\uFFFD]+/, '').trim();
+    return { old: olds.join(' ').trim(), now: empty(now) ? '' : now };
+  }
+  const text = plainText(cellHtml);
+  return /line-through/i.test(cellHtml) ? { old: text, now: '' } : { old: '', now: text };
+}
 
 const PERIODS = /^\d{1,2}(\s*[-–]\s*\d{1,2})?$/;
 
-/** Zeile ohne Spaltenüberschrift: Stunde suchen, davor die Art, danach Lehrer, Fach, Raum, Text (so wie im Untis-Gruppenplan). */
+/** Zeile ohne Spaltenüberschrift: Stunde suchen, davor die Art, danach Vertreter, Fach, Raum, Text (so wie im Untis-Plan nach Klassen). */
 function inferFields(texts: string[]): (Field | null)[] {
   const fields: (Field | null)[] = texts.map(() => null);
   const p = texts.findIndex((t) => PERIODS.test(t));
@@ -96,7 +96,8 @@ function inferFields(texts: string[]): (Field | null)[] {
   fields[p] = 'periods';
   if (p >= 1) fields[p - 1] = 'art';
   if (p >= 2) fields[p - 2] = 'klass';
-  (['teacher', 'subject', 'room', 'note'] as Field[]).forEach((f, i) => {
+  // Im Untis-Plan nach Klassen steht hinter der Stunde die Spalte "Vertreter" (alte Lehrkraft durchgestrichen, neue dahinter)
+  (['substitute', 'subject', 'room', 'note'] as Field[]).forEach((f, i) => {
     if (p + 1 + i < fields.length) fields[p + 1 + i] = f;
   });
   return fields;
@@ -141,23 +142,42 @@ export function parseUntisPlan(html: string, year = new Date().getFullYear()): D
       }
       const cols = fields ?? inferFields(texts);
       const v: Partial<Record<Field, string>> = {};
+      const set = (key: Field, val: string) => {
+        if (val !== '' && !empty(val) && v[key] === undefined) v[key] = val;
+      };
       cols.forEach((f, i) => {
-        if (!f || i >= texts.length || empty(texts[i])) return;
-        // Durchgestrichen heißt: das war vorher so (altes Fach, alter Raum)
-        const key: Field = isStruck(tds[i][2]) ? (f === 'subject' ? 'subjectOld' : f === 'room' ? 'roomOld' : f) : f;
-        if (v[key] === undefined) v[key] = texts[i];
+        if (!f || i >= texts.length) return;
+        const { old, now } = splitStruck(tds[i][2]);
+        if (old === '') return set(f, now);
+        // Durchgestrichen heißt: das war vorher so (altes Fach, alter Raum, alte Lehrkraft), dahinter steht der neue Wert
+        if (f === 'subject') {
+          set('subjectOld', old);
+          set('subject', now);
+        } else if (f === 'room') {
+          set('roomOld', old);
+          set('room', now);
+        } else if (f === 'substitute' || f === 'teacher') {
+          set('teacher', old);
+          set('substitute', now);
+        } else {
+          set(f, texts[i]);
+        }
       });
       const periods = parsePeriods(v.periods ?? '');
       if (periods.length === 0) continue;
       const art = v.art ?? (v.cancel ? 'Entfall' : null);
       const base = { art, note: v.note ?? null, substitute: v.substitute ?? null, room: v.room ?? null, roomOld: v.roomOld ?? null };
+      const kind = substitutionKind(base);
+      // Raumwechsel: die Lehrkraft bleibt, in der Spalte "Vertreter" steht dann sie selbst
+      const teacher = v.teacher ?? (kind === 'room' ? base.substitute : null);
+      if (kind === 'room' && !v.teacher) base.substitute = null;
       out.push({
         date,
         periods,
-        kind: substitutionKind(base),
+        kind,
         subject: v.subject ?? null,
         subjectOld: v.subjectOld ?? null,
-        teacher: v.teacher ?? null,
+        teacher,
         group: null,
         klass: v.klass ?? group,
         source: 'dsb',
@@ -193,8 +213,9 @@ export function classMatches(klass: string | null, levels: string[]): boolean {
 
 /**
  * Behält aus dem Plan der ganzen Schule nur, was die eigenen Stunden betrifft: passende Stufe und eine Stunde im
- * Stundenplan am selben Tag, die sich mit den Stunden des Eintrags überschneidet und zu Fach oder Lehrkraft passt.
- * Ohne Stundenplan bleibt nur der Filter nach Stufe, und ohne Stufe gar keiner.
+ * Stundenplan am selben Tag, die sich mit den Stunden des Eintrags überschneidet und zu der der Eintrag nach Kurscode,
+ * Lehrkraft und Fach passt (substitutionFitsLesson). Gibt es in der Stufe mehrere Kurse desselben Fachs, entscheidet
+ * die Lehrkraft. Ohne Stundenplan bleibt alles, und ohne erkennbare Stufe gibt es keinen Filter nach Stufe.
  */
 export function forStudent(entries: DsbEntry[], tt: Timetable | null): DsbEntry[] {
   if (!tt) return entries;
@@ -202,19 +223,12 @@ export function forStudent(entries: DsbEntry[], tt: Timetable | null): DsbEntry[
   return entries.filter((e) => studentCheck(e, tt, levels) === 'ok');
 }
 
-/** Warum ein Eintrag zu dir passt ('ok') oder nicht: falsche Klasse, keine eigene Stunde zu der Zeit, anderes Fach. */
+/** Warum ein Eintrag zu dir passt ('ok') oder nicht: falsche Klasse, keine eigene Stunde zu der Zeit, anderer Kurs (Fach oder Lehrkraft). */
 export function studentCheck(e: DsbEntry, tt: Timetable, levels: string[] = ownLevels(tt)): 'ok' | 'klass' | 'lesson' | 'subject' {
   if (!classMatches(e.klass, levels)) return 'klass';
   const mine = lessonsOn(tt, e.date).filter((l) => e.periods.some((p) => p >= l.period && p < l.period + l.span));
   if (mine.length === 0) return 'lesson';
-  const names = [e.subject, e.subjectOld].filter((x): x is string => Boolean(x));
-  if (names.length === 0) return 'ok'; // Plan ohne Fach: die Stunde allein entscheidet
-  const fits = mine.some(
-    (l) =>
-      names.some((n) => subjectMatchesAbbr(n, l.abbr)) ||
-      (e.teacher !== null && l.teacher !== '' && e.teacher.toLowerCase() === l.teacher.toLowerCase()),
-  );
-  return fits ? 'ok' : 'subject';
+  return mine.some((l) => substitutionFitsLesson(e, l)) ? 'ok' : 'subject';
 }
 
 export interface DsbDiagnosis {

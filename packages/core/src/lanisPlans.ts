@@ -13,7 +13,7 @@
  */
 
 import { CONFIG } from './config';
-import { matchSubject } from './lanis';
+import { LANIS_SUBJECT_NAMES, matchSubject } from './lanis';
 
 export interface TimetablePeriod {
   period: number;
@@ -190,7 +190,9 @@ export interface SubstitutionEntry {
   subjectOld: string | null;
   room: string | null;
   roomOld: string | null;
+  /** Neue Lehrkraft (Vertreter) */
   substitute: string | null;
+  /** Lehrkraft, die den Kurs sonst unterrichtet (die alte Lehrkraft), null wenn der Plan sie nicht nennt */
   teacher: string | null;
   note: string | null;
   group: string | null;
@@ -259,6 +261,60 @@ export function parseSubstitutions(date: string, raw: unknown): SubstitutionEntr
   return out.sort((a, b) => (a.periods[0] ?? 0) - (b.periods[0] ?? 0));
 }
 
+/**
+ * Passt ein Fach aus dem Plan ("M", "Mathe", "M-GK1", "Bio") zum Fachkürzel einer Stunde ("M")?
+ * Gleich, oder der Name ist ein bekannter Name des Kürzels (Mathe, Mathematik), oder einer der Namen beginnt mit dem anderen
+ * (mindestens zwei Zeichen, damit "E" nicht zu "Ethik" passt).
+ */
+export function subjectMatchesAbbr(name: string, abbr: string): boolean {
+  const token = name.trim().replace(/^(?:Q[1-4]|E\d)(?=[A-Za-zÄÖÜäöü])/i, '').toLowerCase().split(/[\s\-_/.]+/)[0].replace(/\d+$/, '');
+  const a = abbr.toLowerCase();
+  if (!token || !a) return false;
+  if (token === a) return true;
+  if (LANIS_SUBJECT_NAMES[a]?.some((n) => n.startsWith(token) || token.startsWith(n))) return token.length >= 2;
+  const [short, long] = token.length <= a.length ? [token, a] : [a, token];
+  return short.length >= 2 && long.startsWith(short);
+}
+
+
+/** Kurscode wie "Q1INFO_LK01", "E1POWI04" oder "Q3GEO01": Stufe, Fach und Nummer. Ein bloßes Fachkürzel ("POWI", "G") ist keiner. */
+export function isCourseCode(name: string): boolean {
+  return /^(?:Q[1-4]|E\d)[A-Za-zÄÖÜäöü]/.test(name.trim()) && /\d/.test(name);
+}
+
+const compactCode = (c: string) => c.replace(/[\s_-]+/g, '').toLowerCase();
+
+/** Gleiche Lehrkraft? Kürzel ohne Groß- und Kleinschreibung, mehrere Kürzel in einer Zelle ("Abc, Xyz") reichen bei einem gemeinsamen. */
+export function sameTeacher(a: string, b: string): boolean {
+  const tokens = (t: string) => t.toLowerCase().split(/[\s,;/+]+/).filter(Boolean);
+  const bs = tokens(b);
+  return tokens(a).some((t) => bs.includes(t));
+}
+
+/**
+ * Gehört ein Eintrag im Vertretungsplan zu dieser eigenen Stunde (es zählt nur die Stunde selbst, nicht der Tag)?
+ * Ja, wenn
+ * - die Lerngruppe (Lanis) oder ein Kurscode im Plan gleich dem Kurscode der Stunde ist,
+ * - die Lehrkraft des Plans (die alte) gleich der Lehrkraft der Stunde ist (zwei Kurse gleichzeitig bei einer Lehrkraft gibt es nicht), oder
+ * - das Fach passt UND die Lehrkraft ist auf einer Seite unbekannt. Ein anderer Kurscode desselben Fachs ist ein anderer Kurs,
+ *   da hilft nur dieselbe Lehrkraft.
+ * Ohne Fach entscheidet die Lehrkraft, ohne beides die Zeit. Nur mit Lerngruppe (Lanis) und ohne Fach zählt allein die Lerngruppe.
+ */
+export function substitutionFitsLesson(
+  e: Pick<SubstitutionEntry, 'subject' | 'subjectOld' | 'teacher' | 'group'>,
+  lesson: Pick<TimetableLesson, 'course' | 'abbr' | 'teacher'>,
+): boolean {
+  if (e.group !== null && compactCode(e.group) === compactCode(lesson.course)) return true;
+  const names = [e.subject, e.subjectOld].filter((x): x is string => Boolean(x));
+  if (names.some((n) => isCourseCode(n) && compactCode(n) === compactCode(lesson.course))) return true;
+  const teacherKnown = Boolean(e.teacher) && lesson.teacher !== '';
+  const teacherEqual = teacherKnown && sameTeacher(e.teacher as string, lesson.teacher);
+  if (teacherEqual) return true;
+  const teacherOk = !teacherKnown;
+  if (names.length === 0) return e.group === null && teacherOk;
+  return names.some((n) => !isCourseCode(n) && subjectMatchesAbbr(n, lesson.abbr)) && teacherOk;
+}
+
 export interface DayView {
   lesson: TimetableLesson;
   subjectId: string | null;
@@ -277,10 +333,7 @@ export function dayView(
   const lessons = lessonsOn(tt, iso).map((lesson) => {
     const mine = todays.filter((s) => {
       const overlaps = s.periods.some((p) => p >= lesson.period && p < lesson.period + lesson.span);
-      if (!overlaps) return false;
-      const sameGroup = s.group !== null && s.group.toLowerCase() === lesson.course.toLowerCase();
-      const sameSubject = [s.subject, s.subjectOld].some((f) => f !== null && courseAbbr(f) === lesson.abbr);
-      return sameGroup || sameSubject || (s.group === null && s.subject === null && s.subjectOld === null);
+      return overlaps && substitutionFitsLesson(s, lesson);
     });
     mine.forEach((s) => used.add(s));
     return { lesson, subjectId: matchSubject(lesson.abbr, subjects), substitutions: mine };

@@ -110,10 +110,16 @@ export const CONFIG = {
     // Preise in US-Dollar je Million Token, laut Preisliste der Anthropic-Doku. Haiku 5.5: bis 100.000 Token Eingabe,
     // darüber 0,50 und 2,50 (eine Anfrage hier bleibt weit darunter, ein Test prüft das).
     prices: {
-      'claude-haiku-5-5': { inputUsdPerMTok: 0.1, outputUsdPerMTok: 0.5 },
+      // Haiku 5.5 über 100.000 Token Eingabe: 0,50 und 2,50 für die ganze Anfrage (die Kostengrenze rechnet damit)
+      'claude-haiku-5-5': { inputUsdPerMTok: 0.1, outputUsdPerMTok: 0.5, longAboveInputTokens: 100_000, longInputUsdPerMTok: 0.5, longOutputUsdPerMTok: 2.5 },
       'claude-sonnet-5-5': { inputUsdPerMTok: 2, outputUsdPerMTok: 10 },
-    } as Record<string, { inputUsdPerMTok: number; outputUsdPerMTok: number }>,
-    maxImageTokens: 3400, // obere Schätzung pro Bild bei 1600 px (28-px-Kacheln: 58 x 58 = 3364)
+    } as Record<string, { inputUsdPerMTok: number; outputUsdPerMTok: number; longAboveInputTokens?: number; longInputUsdPerMTok?: number; longOutputUsdPerMTok?: number }>,
+    // Bild-Tokens laut Anthropic-Doku (Vision): ⌈Breite/28⌉ x ⌈Höhe/28⌉, größere Bilder verkleinert Claude. Höchstwert bei Haiku 5.5 und
+    // Sonnet 5.5 (hohe Auflösung, Claude 4.7 und neuer): 4784 Token. Die Kostengrenze rechnet mit den Maßen aus dem JPEG-Kopf
+    // (A4 bei 1600 px: 41 x 58 = 2378) plus Zuschlag, ohne lesbare Maße mit dem Höchstwert. So bleibt sie immer eine Obergrenze.
+    maxImageTokens: 4800,
+    imagePatchPx: 28,
+    imageTokenMargin: 16,
     textCharsPerToken: 2.5, // vorsichtig für deutschen Text
     promptOverheadTokens: 700, // System-Prompt und Beschriftungen (ein Test prüft, dass der Prompt darunter bleibt)
     // Kurze Ausgabe spart am meisten, denn Ausgabe-Tokens kosten fünfmal so viel wie Eingabe-Tokens.
@@ -234,7 +240,7 @@ export const CONFIG = {
     syncDelayMs: 4000, // so lange nach der letzten Änderung wird die Warteschlange erneuert
   },
   style: {
-    // Stil der echten Aufgabenblätter lernen (Edge Function learn-style, Haiku, Kosten ein bis drei Cent je Blatt)
+    // Stil der echten Aufgabenblätter lernen (Edge Function learn-style, Haiku, Kosten unter einem halben Cent je Blatt)
     maxPages: 8, // Seiten pro Blatt
     maxTokens: 1800, // Obergrenze der Antwort, das Denken zählt mit
     maxItems: 8, // Einträge je Liste beim Lernen
@@ -295,8 +301,8 @@ export const CONFIG = {
   },
   pdf: {
     // Arbeitsblätter zu einem PDF zusammenfügen (im Browser, ohne KI)
-    imageEdge: 2000, // längste Kante der Fotos im PDF in Pixeln, nie vergrößern
-    imageQuality: 0.82,
+    imageEdge: 1600, // längste Kante der Fotos im PDF in Pixeln, nie vergrößern (1600 px auf A4 sind etwa 190 dpi, gut lesbar)
+    imageQuality: 0.75, // spart Speicher, Text bleibt scharf
     maxPages: 100,
     maxBytes: 30 * 1024 * 1024, // passt zur Grenze des Speichers "documents"
     a4: { width: 595.28, height: 841.89 }, // Punkte

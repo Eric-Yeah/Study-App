@@ -2,7 +2,7 @@
 //
 // - Verify JWT AUS (npx supabase functions deploy push-send --no-verify-jwt), denn den Takt ruft pg_cron ohne Anmeldung auf.
 //   Es sind keine Secrets nötig: Die Function erzeugt ihren VAPID-Schlüssel beim ersten Aufruf selbst und legt ihn in der Tabelle
-//   push_keys ab (nur service_role, Migration 20261026). Der Takt (pg_cron, alle 10 Sekunden, nur wenn etwas fällig ist) kommt mit
+//   push_keys ab (nur service_role, Migration 20261026). Der Takt (pg_cron, einmal pro Minute, nur wenn etwas fällig ist, Migration 20261029) kommt mit
 //   einem Token aus push_keys.
 // - Ops (POST, JSON): { op: 'key' } liefert den öffentlichen VAPID-Schlüssel für die App, { op: 'tick', token } sendet die fälligen
 //   Nachrichten aus push_queue (RPC push_due, markiert sie als gesendet) und löscht Abos, die der Push-Dienst nicht mehr kennt (404, 410).

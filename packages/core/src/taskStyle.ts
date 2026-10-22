@@ -65,6 +65,24 @@ export function sanitizeStyle(v: unknown, l: StyleLimits): TaskStyle {
   };
 }
 
+const STRING_LIST = { type: 'array', items: { type: 'string' } } as const;
+
+/** JSON-Schema des Stils für die strukturierte Ausgabe (output_config.format). parseStyle bleibt als Sicherung. */
+export const STYLE_SCHEMA = {
+  type: 'object',
+  properties: {
+    zusammenfassung: { type: 'string' },
+    aufbau: STRING_LIST,
+    formulierungen: STRING_LIST,
+    operatoren: STRING_LIST,
+    materialien: STRING_LIST,
+    bewertung: STRING_LIST,
+    besonderheiten: STRING_LIST,
+  },
+  required: ['zusammenfassung', 'aufbau', 'formulierungen', 'operatoren', 'materialien', 'bewertung', 'besonderheiten'],
+  additionalProperties: false,
+} as const;
+
 /** Liest die Antwort der KI. null, wenn kein Stil zu erkennen ist. */
 export function parseStyle(raw: string, l: StyleLimits): TaskStyle | null {
   const start = raw.indexOf('{');

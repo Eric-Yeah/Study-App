@@ -4,15 +4,16 @@
 // - Der API-Schlüssel liegt nur als Secret ANTHROPIC_API_KEY hier, nie im Frontend.
 // - Anfrage: { examId, noteIds: string[], existing?: string[] }. Antwort: { topics: [{ title, sources }], notes: [{ id, title }], model, usage, budget }
 //   oder { error, message } auf Deutsch. "sources" sind Nummern ab 1 in der Reihenfolge von "notes".
-// - Modell: CONFIG.ai.models.text (Haiku, Effort medium über output_config.effort), kein thinking, temperature, top_p, top_k.
+// - Modell: CONFIG.ai.models.text (Haiku, Effort medium über output_config.effort, Antwort als JSON-Schema über
+//   output_config.format), kein thinking, temperature, top_p, top_k.
 // - Kostengrenze wie bei den anderen Functions: vor der Anfrage der schlimmste Fall mit dem Preis des Modells (CONFIG.ai).
 // - Gespeichert wird hier nichts: Die App legt die Themen erst an, wenn der Nutzer sie abhakt.
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { CONFIG } from '../_shared/config.ts';
 import { languageRule } from '../_shared/languages.ts';
-import { parseTopics, topicsMaterial, topicsPrompt } from '../_shared/topics.ts';
-import { costUsd, fitsBudget, spentUsd, worstCaseUsd, type ModelChoice } from '../_shared/worksheets.ts';
+import { parseTopics, TOPICS_SCHEMA, topicsMaterial, topicsPrompt } from '../_shared/topics.ts';
+import { costUsd, fitsBudget, outputConfig, spentUsd, worstCaseUsd, type ModelChoice } from '../_shared/worksheets.ts';
 import { GateError, openGate, type Gate } from '../_shared/gate.ts';
 
 const API_URL = 'https://api.anthropic.com/v1/messages';
@@ -204,7 +205,7 @@ Deno.serve(async (req) => {
             max_tokens: CONFIG.topics.maxTokens,
             system,
             messages: [{ role: 'user', content: [{ type: 'text', text: userText }] }],
-            output_config: { effort: choice.effort },
+            output_config: outputConfig(choice.effort, TOPICS_SCHEMA), // strukturierte Ausgabe, parseTopics bleibt als Sicherung
           }),
         });
       let res: Response;

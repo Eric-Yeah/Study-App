@@ -4,7 +4,8 @@
 // - Der API-Schlüssel liegt nur als Secret ANTHROPIC_API_KEY hier, nie im Frontend.
 // - Anfrage: { subjectId, teacher?, pages: [{ type: 'text', text } | { type: 'image', path }] } (Bilder im Speicher "exams", Ordner des Nutzers).
 //   Antwort: { style, model, usage, budget } oder { error, message } auf Deutsch.
-// - Modell: nur Text CONFIG.ai.models.text, mit Bild CONFIG.ai.models.image (beide Haiku, Effort medium über output_config.effort),
+// - Modell: nur Text CONFIG.ai.models.text, mit Bild CONFIG.ai.models.image (beide Haiku, Effort medium über output_config.effort,
+//   Antwort als JSON-Schema über output_config.format),
 //   kein thinking, temperature, top_p, top_k. Kostengrenze wie bei den anderen Functions (schlimmster Fall vor der Anfrage).
 // - Gespeichert wird hier nichts: Die App zeigt den Stil, der Nutzer ändert ihn und speichert (task_styles). Die hochgeladenen
 //   Bilder löscht die Function am Ende selbst, auch bei einem Fehler.
@@ -12,8 +13,8 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { CONFIG } from '../_shared/config.ts';
 import { languageRule } from '../_shared/languages.ts';
-import { parseStyle, stylePrompt } from '../_shared/taskStyle.ts';
-import { chooseModel, costUsd, fitsBudget, spentUsd, worstCaseUsd, type WorksheetPage } from '../_shared/worksheets.ts';
+import { parseStyle, STYLE_SCHEMA, stylePrompt } from '../_shared/taskStyle.ts';
+import { chooseModel, costUsd, fitsBudget, imageTokenBound, jpegSize, outputConfig, spentUsd, worstCaseUsd, type WorksheetPage } from '../_shared/worksheets.ts';
 import { GateError, openGate, type Gate } from '../_shared/gate.ts';
 
 const API_URL = 'https://api.anthropic.com/v1/messages';
@@ -194,6 +195,8 @@ Deno.serve(async (req) => {
         if (error || !file) throw new Failure('not_found');
         const bytes = new Uint8Array(await file.arrayBuffer());
         if (bytes.byteLength > MAX_IMAGE_BYTES) throw new Failure('bad_request');
+        // Obergrenze der Bild-Tokens aus den echten Maßen, für die Kostengrenze (ohne lesbare Maße: Höchstwert)
+        page.tokens = imageTokenBound(jpegSize(bytes), CONFIG.ai);
         content.push({ type: 'text', text: `Seite ${n} (Bild):` });
         content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: toBase64(bytes) } });
       }
@@ -243,7 +246,7 @@ Deno.serve(async (req) => {
             max_tokens: CONFIG.style.maxTokens,
             system,
             messages: [{ role: 'user', content }],
-            output_config: { effort: choice.effort },
+            output_config: outputConfig(choice.effort, STYLE_SCHEMA), // strukturierte Ausgabe, parseStyle bleibt als Sicherung
           }),
         });
       let res: Response;

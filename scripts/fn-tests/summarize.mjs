@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict';
 const UID = '11111111-2222-3333-4444-555555555555';
 const GOOD = `${UID}/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee.jpg`;
+// Bilder mit echtem JPEG-Kopf (Maße lesbar): A4 bei 1600 px und ein riesiges Bild
+const jpeg = (w, h) => new Uint8Array([0xff, 0xd8, 0xff, 0xc0, 0x00, 0x11, 0x08, h >> 8, h & 0xff, w >> 8, w & 0xff, 0x03, 0x01, 0x22, 0x00, 0x02, 0x11, 0x01, 0x03, 0x11, 0x01, 0xff, 0xd9]);
+const A4 = `${UID}/aaaaaaaa-bbbb-cccc-dddd-a4a4a4a4a4a4.jpg`, HUGE = `${UID}/aaaaaaaa-bbbb-cccc-dddd-888888888888.jpg`;
+const BYTES = { [A4]: jpeg(1131, 1600), [HUGE]: jpeg(8000, 8000) };
 const OTHER = `99999999-2222-3333-4444-555555555555/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee.jpg`;
 const HAIKU = 'claude-haiku-5-5', SONNET = 'claude-sonnet-5-5';
 const PRICE = { [HAIKU]: [0.1, 0.5], [SONNET]: [2, 10] };
-const db = { rows: {}, rpc: [], log: [], linked: new Set([GOOD]), notes: new Set(['note1', 'note-en', 'note-bili']), files: new Set([GOOD]) };
+const db = { rows: {}, rpc: [], log: [], linked: new Set([GOOD, A4, HUGE]), notes: new Set(['note1', 'note-en', 'note-bili']), files: new Set([GOOD, A4, HUGE]) };
 const spentOf = () => Object.entries(db.rows).reduce((s, [m, r]) => s + (r.input_tokens * PRICE[m][0] + r.output_tokens * PRICE[m][1]) / 1e6, 0);
 const requestsOf = () => Object.values(db.rows).reduce((s, r) => s + r.requests, 0);
 const setRow = (model, input_tokens, output_tokens, requests = 0) => { db.rows[model] = { model, requests, input_tokens, output_tokens }; };
@@ -29,7 +33,7 @@ globalThis.__cc = (_url, key, opts) => {
   return {
     auth: { getUser: async () => ({ data: { user: authz === 'Bearer good' ? { id: UID } : null } }) },
     from: q,
-    storage: { from: () => ({ download: async (p) => db.files.has(p) ? { data: new Blob([new Uint8Array([255, 216, 255, 1, 2, 3])]), error: null } : { data: null, error: { message: 'nf' } } }) },
+    storage: { from: () => ({ download: async (p) => db.files.has(p) ? { data: new Blob([BYTES[p] ?? new Uint8Array([255, 216, 255, 1, 2, 3])]), error: null } : { data: null, error: { message: 'nf' } } }) },
     rpc: async (name, args) => {
       if (name === 'ai_begin') { db.locks = (db.locks ?? 0) + 1; return { data: !db.busy }; } if (name === 'ai_end') { db.unlocks = (db.unlocks ?? 0) + 1; return { data: null }; } 
       assert.equal(service, true, 'ai_usage_add nur mit Service-Schlüssel'); assert.equal(name, 'ai_usage_add'); assert.ok(args.p_model, 'Modell wird mitgezählt');
@@ -44,6 +48,9 @@ let handler; globalThis.Deno = { env: { get: (k) => env[k] }, serve: (h) => { ha
 await import(process.env.FN_COPY);
 // Dieselbe Konfiguration wie in der Function (gleiche Moduldatei), damit der Test die Eskalation ein- und ausschalten kann
 const { CONFIG } = await import(new URL('../_shared/config.ts', 'file://' + process.env.FN_COPY));
+// Strukturierte Ausgabe: Effort und JSON-Schema stehen zusammen in output_config
+const { SUMMARY_SCHEMA } = await import(new URL('../_shared/worksheets.ts', 'file://' + process.env.FN_COPY));
+const oc = (effort) => ({ effort, format: { type: 'json_schema', schema: SUMMARY_SCHEMA } });
 
 const anthropicCalls = []; let script = [];
 const reply = (text, { stop = 'end_turn', usage = { input_tokens: 100, output_tokens: 50 } } = {}) => ({ status: 200, body: { content: [{ type: 'text', text }], stop_reason: stop, usage } });
@@ -64,14 +71,14 @@ let st, b;
 reset([reply(good())]); [st, b] = await call({ lessonNoteId: 'note1', pages: [text] });
 assert.equal(st, 200); assert.equal(b.effort, 'medium'); assert.equal(b.model, HAIKU); assert.equal(b.retried, false);
 const body1 = anthropicCalls[0].body;
-assert.equal(body1.model, HAIKU); assert.equal(body1.max_tokens, 2000); assert.deepEqual(body1.output_config, { effort: 'medium' });
+assert.equal(body1.model, HAIKU); assert.equal(body1.max_tokens, 2000); assert.deepEqual(body1.output_config, oc('medium'));
 for (const k of ['thinking', 'temperature', 'top_p', 'top_k']) assert.ok(!(k in body1), `kein ${k}`);
 assert.equal(anthropicCalls[0].url, 'https://api.anthropic.com/v1/messages'); assert.equal(anthropicCalls[0].headers['x-api-key'], 'sk-test');
 assert.deepEqual(db.rpc, [{ p_user: UID, p_month: new Date().toISOString().slice(0, 7), p_model: HAIKU, p_input: 100, p_output: 50 }]);
 ok('nur Text: Haiku, Effort medium, kein thinking/temperature/top_p/top_k, Verbrauch mit Modell gezählt');
 
 reset([reply(good())]); [st, b] = await call({ lessonNoteId: 'note1', pages: [text, img] });
-assert.equal(b.effort, 'medium'); assert.equal(b.model, HAIKU); assert.deepEqual(anthropicCalls[0].body.output_config, { effort: 'medium' });
+assert.equal(b.effort, 'medium'); assert.equal(b.model, HAIKU); assert.deepEqual(anthropicCalls[0].body.output_config, oc('medium'));
 const imgBlock = anthropicCalls[0].body.messages[0].content.find((c) => c.type === 'image');
 assert.equal(imgBlock.source.type, 'base64'); assert.equal(imgBlock.source.media_type, 'image/jpeg'); assert.equal(imgBlock.source.data, Buffer.from([255, 216, 255, 1, 2, 3]).toString('base64'));
 ok('mit Bild: Haiku, Effort medium, Bild als base64 JPEG');
@@ -89,14 +96,14 @@ for (const [label, pages] of [['Text', [text]], ['Bild', [img]]]) {
   reset([reply(good({ lesbarkeit: 'unsicher' }), { usage: { input_tokens: 1000, output_tokens: 200 } }), reply(good({ thema: 'Genauer' }), { usage: { input_tokens: 1000, output_tokens: 300 } })]);
   [st, b] = await call({ lessonNoteId: 'note1', pages });
   assert.equal(anthropicCalls.length, 2); assert.equal(anthropicCalls[0].body.model, HAIKU);
-  assert.equal(anthropicCalls[1].body.model, SONNET); assert.deepEqual(anthropicCalls[1].body.output_config, { effort: 'medium' });
+  assert.equal(anthropicCalls[1].body.model, SONNET); assert.deepEqual(anthropicCalls[1].body.output_config, oc('medium'));
   assert.equal(b.retried, true); assert.equal(b.model, SONNET); assert.equal(b.summary.thema, 'Genauer');
   assert.equal(db.rows[HAIKU].requests, 1); assert.equal(db.rows[SONNET].requests, 1); assert.equal(db.rows[SONNET].output_tokens, 300);
   ok(`unsicher bei ${label}: mit autoEscalate einmal mit Sonnet (medium), Verbrauch je Modell getrennt gezählt`);
 }
 
 reset([reply(good({ lesbarkeit: 'unsicher' }))]); [st, b] = await call({ lessonNoteId: 'note1', pages: [img], forceEffort: 'high' });
-assert.equal(anthropicCalls.length, 1); assert.equal(anthropicCalls[0].body.model, SONNET); assert.deepEqual(anthropicCalls[0].body.output_config, { effort: 'high' }); assert.equal(b.retried, false);
+assert.equal(anthropicCalls.length, 1); assert.equal(anthropicCalls[0].body.model, SONNET); assert.deepEqual(anthropicCalls[0].body.output_config, oc('high')); assert.equal(b.retried, false);
 ok('"Genauer lesen": gleich Sonnet mit high, keine weitere Wiederholung bei unsicher');
 reset([reply(good())]); await call({ lessonNoteId: 'note1', pages: [text], forceEffort: 'medium' }); assert.equal(anthropicCalls[0].body.model, SONNET);
 for (const bad of ['max', 'low', 'xhigh; drop table', 42]) { reset([reply(good())]); await call({ lessonNoteId: 'note1', pages: [text], forceEffort: bad }); assert.equal(anthropicCalls[0].body.model, HAIKU, String(bad)); assert.equal(anthropicCalls[0].body.output_config.effort, 'medium'); }
@@ -174,6 +181,16 @@ reset([reply(good())]); setRow(SONNET, 2_380_000, 20_000, 10);
 reset(); setRow(SONNET, 2_380_000, 20_000, 10);
 [st, b] = await call({ lessonNoteId: 'note1', pages: Array(5).fill(img), forceEffort: 'high' }); assert.equal(st, 429); assert.equal(b.error, 'budget_reached'); assert.equal(anthropicCalls.length, 0);
 ok('Restbudget: dieselbe Anfrage geht mit Haiku, wird mit Sonnet (Genauer lesen) vorher abgelehnt');
+
+// Bild-Tokens aus den echten Maßen: 5 A4-Seiten (je 41 x 58 Kacheln) passen noch, dieselbe Anfrage mit unlesbaren oder riesigen
+// Bildern rechnet mit dem Höchstwert je Bild und wird vorher abgelehnt (Rest 0,06 $, Sonnet high)
+reset([reply(good())]); setRow(SONNET, 2_470_000, 0, 10);
+[st, b] = await call({ lessonNoteId: 'note1', pages: Array(5).fill({ type: 'image', path: A4 }), forceEffort: 'high' }); assert.equal(st, 200); assert.equal(anthropicCalls.length, 1);
+for (const path of [GOOD, HUGE]) {
+  reset(); setRow(SONNET, 2_470_000, 0, 10);
+  [st, b] = await call({ lessonNoteId: 'note1', pages: Array(5).fill({ type: 'image', path }), forceEffort: 'high' }); assert.equal(st, 429, path); assert.equal(b.error, 'budget_reached'); assert.equal(anthropicCalls.length, 0);
+}
+ok('Kostengrenze mit Bildmaßen aus dem JPEG-Kopf: A4 genauer, unlesbare und riesige Bilder mit dem Höchstwert (bleibt Obergrenze)');
 
 reset([reply(good({ lesbarkeit: 'unsicher' }), { usage: { input_tokens: 5000, output_tokens: 1000 } }), reply(good())]); setRow(SONNET, 2_000_000, 99_500, 10);
 [st, b] = await call({ lessonNoteId: 'note1', pages: [text] });

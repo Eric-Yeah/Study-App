@@ -31,7 +31,7 @@ export type RubricFamily =
 export type ExamPageRole = 'aufgabe' | 'loesung' | 'erwartung' | 'korrigiert';
 export const EXAM_PAGE_ROLES: readonly ExamPageRole[] = ['aufgabe', 'loesung', 'erwartung', 'korrigiert'];
 
-export type ExamPage = { type: 'text'; text: string; role: ExamPageRole } | { type: 'image'; path: string; role: ExamPageRole };
+export type ExamPage = { type: 'text'; text: string; role: ExamPageRole } | { type: 'image'; path: string; role: ExamPageRole; tokens?: number }; // tokens: Obergrenze aus den Bildmaßen, setzt die Edge Function
 
 export interface RubricCriterion {
   name: string;
@@ -428,6 +428,84 @@ const PARTS_RULE: Record<GradingScheme, string> = {
   latein:
     '"teile.uebersetzung_fehler": Summe der gewichteten Fehler der Übersetzung (halb 0.5, ganz 1, anderthalb 1.5, doppelt 2), "teile.uebersetzung_woerter": Wörter des lateinischen Textes, beide null ohne Übersetzung. Die Aufgaben sind nur die Interpretationsaufgaben. "sprache": alle Werte null.',
 };
+
+const NULLABLE_NUMBER = { anyOf: [{ type: 'number' }, { type: 'null' }] } as const;
+
+/**
+ * JSON-Schema der Korrektur für die strukturierte Ausgabe (output_config.format). Gilt für alle Fächer: welche Teile null sind,
+ * sagt der Prompt (PARTS_RULE). parseExamResult bleibt als Sicherung (Punkte begrenzen, Längen kürzen).
+ */
+export const EXAM_RESULT_SCHEMA = {
+  type: 'object',
+  properties: {
+    aufgaben: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          nr: { type: 'string' },
+          titel: { type: 'string' },
+          operator: { type: 'string' },
+          afb: { anyOf: [{ type: 'integer', enum: [1, 2, 3] }, { type: 'null' }] },
+          max: { type: 'number' },
+          max_geschaetzt: { type: 'boolean' },
+          punkte: { type: 'number' },
+          richtig: { type: 'array', items: { type: 'string' } },
+          fehlt: { type: 'array', items: { type: 'string' } },
+          tipp: { type: 'string' },
+          unsicher: { type: 'boolean' },
+        },
+        required: ['nr', 'titel', 'operator', 'afb', 'max', 'max_geschaetzt', 'punkte', 'richtig', 'fehlt', 'tipp', 'unsicher'],
+        additionalProperties: false,
+      },
+    },
+    teile: {
+      type: 'object',
+      properties: {
+        darstellung: NULLABLE_NUMBER,
+        richtigkeit: NULLABLE_NUMBER,
+        ausdruck: NULLABLE_NUMBER,
+        uebersetzung_fehler: NULLABLE_NUMBER,
+        uebersetzung_woerter: NULLABLE_NUMBER,
+      },
+      required: ['darstellung', 'richtigkeit', 'ausdruck', 'uebersetzung_fehler', 'uebersetzung_woerter'],
+      additionalProperties: false,
+    },
+    sprache: {
+      type: 'object',
+      properties: { fehler: NULLABLE_NUMBER, woerter: NULLABLE_NUMBER, anteil: NULLABLE_NUMBER },
+      required: ['fehler', 'woerter', 'anteil'],
+      additionalProperties: false,
+    },
+    staerken: { type: 'array', items: { type: 'string' } },
+    schwaechen: { type: 'array', items: { type: 'string' } },
+    naechste_schritte: { type: 'array', items: { type: 'string' } },
+    lesbarkeit: { type: 'string', enum: ['sicher', 'unsicher'] },
+    erwartung_genutzt: { type: 'boolean' },
+  },
+  required: ['aufgaben', 'teile', 'sprache', 'staerken', 'schwaechen', 'naechste_schritte', 'lesbarkeit', 'erwartung_genutzt'],
+  additionalProperties: false,
+} as const;
+
+/** JSON-Schema für das Lernen aus der Korrektur der Lehrkraft (Modus learn). parseLearn bleibt als Sicherung. */
+export const LEARN_SCHEMA = {
+  type: 'object',
+  properties: {
+    punkte_lehrkraft: NULLABLE_NUMBER,
+    aufgaben_lehrkraft: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { nr: { type: 'string' }, punkte: { type: 'number' } },
+        required: ['nr', 'punkte'],
+        additionalProperties: false,
+      },
+    },
+    lehren: { type: 'array', items: { type: 'string' } },
+  },
+  required: ['punkte_lehrkraft', 'aufgaben_lehrkraft', 'lehren'],
+  additionalProperties: false,
+} as const;
 
 /** System-Prompt der Korrektur. Die KI bewertet Aufgaben und Teile, die Note rechnet die App (gradeExam). */
 export function examPrompt(i: ExamPromptInput): string {

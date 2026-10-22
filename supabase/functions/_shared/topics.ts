@@ -102,6 +102,24 @@ export function topicsPrompt(i: TopicsPromptInput): string {
   return lines.join('\n');
 }
 
+/** JSON-Schema der Themenliste für die strukturierte Ausgabe (output_config.format). parseTopics bleibt als Sicherung. */
+export const TOPICS_SCHEMA = {
+  type: 'object',
+  properties: {
+    themen: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { titel: { type: 'string' }, quellen: { type: 'array', items: { type: 'integer' } } },
+        required: ['titel', 'quellen'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['themen'],
+  additionalProperties: false,
+} as const;
+
 export interface SuggestedTopic {
   title: string;
   sources: number[]; // Nummern der Notizen (ab 1) in der Reihenfolge, in der sie gesendet wurden

@@ -12,7 +12,7 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
-    version: '2026.10.22.3',
+    version: '2026.10.22.4',
     date: '22. Oktober 2026',
     items: [
       { icon: '🔎', title: 'DSBmobile: Was wurde gelesen?', text: 'Unter Einstellungen → Vertretungsplan (DSBmobile) siehst du jetzt nach jedem Abruf, wie viele Einträge im Plan deiner Schule standen und wie viele davon zu dir passen (und warum der Rest nicht). Passt etwas nicht, kannst du den Plan-Ausschnitt kopieren.' },

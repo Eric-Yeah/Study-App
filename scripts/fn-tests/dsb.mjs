@@ -19,7 +19,7 @@ const menu = {
   ResultMenuItems: [{ Title: 'Inhalte', Childs: [
     { Title: 'Pläne', Root: { Childs: [
       { Title: 'Heute', Childs: [{ Title: 'Heute', Detail: 'https://light.dsbcontrol.de/DSBlightWebsite/Data/abc/subst_001.htm' }] },
-      { Title: 'Morgen', Childs: { Title: 'Morgen', Detail: 'https://light.dsbcontrol.de/DSBlightWebsite/Data/abc/subst_002.htm' } },
+      { Title: 'Morgen', Childs: { Title: 'Morgen', Detail: 'https://dsbmobile.de/data/abc/subst_002.htm' } },
       { Title: 'Fremd', Childs: [{ Detail: 'https://evil.example.com/subst_003.htm' }] },
       { Title: 'Bild', Childs: [{ Detail: 'https://light.dsbcontrol.de/x/plan.jpg' }] },
       { Title: 'News', Childs: [{ Detail: 'https://light.dsbcontrol.de/x/news.htm' }] },
@@ -70,7 +70,7 @@ assert.equal(dsb.requests[0].UserId, '123456');
 assert.ok(!JSON.stringify(b).includes('geheim'));
 ok('lädt die Pläne (UTF-8 und Latin-1), das Passwort steht nie in der Antwort');
 const pageCalls = dsb.fetches.filter((u) => !u.includes('GetData'));
-assert.deepEqual(pageCalls, ['https://light.dsbcontrol.de/DSBlightWebsite/Data/abc/subst_001.htm', 'https://light.dsbcontrol.de/DSBlightWebsite/Data/abc/subst_002.htm']);
+assert.deepEqual(pageCalls, ['https://light.dsbcontrol.de/DSBlightWebsite/Data/abc/subst_001.htm', 'https://dsbmobile.de/data/abc/subst_002.htm']);
 ok('fremde Server, http, Bilder und news-Seiten werden nicht geladen');
 dsb.login = false; [st, b] = await call(body); assert.equal(st, 401); assert.equal(b.error, 'login_failed');
 ok('falsche Zugangsdaten: 401 login_failed');

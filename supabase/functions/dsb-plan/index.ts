@@ -11,7 +11,7 @@
 // Protokoll der inoffiziellen "Mobile API" (aus den Bibliotheken dsbapi/dsbuntis): POST app.dsbcontrol.de/JsonHandler.ashx/GetData
 // mit { req: { Data: base64(gzip(JSON)), DataType: 1 } }, Antwort { d: base64(gzip(JSON)) } mit Resultcode (0 = in Ordnung)
 // und ResultMenuItems, deren Knoten mit "Detail" die Adressen der Pläne enthalten. Die Adressen kommen von DSB und werden
-// nur geladen, wenn sie https auf dsbcontrol.de oder heinekingmedia.de sind (kein Zugriff auf beliebige Server).
+// nur geladen, wenn sie https auf dsbcontrol.de, dsbmobile.de oder heinekingmedia.de sind (kein Zugriff auf beliebige Server).
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
@@ -48,7 +48,7 @@ async function pipe(bytes: Uint8Array, stream: CompressionStream | Decompression
   return new Uint8Array(await out.arrayBuffer());
 }
 
-const allowedHost = (host: string) => /(^|\.)dsbcontrol\.de$/i.test(host) || /(^|\.)heinekingmedia\.de$/i.test(host);
+const allowedHost = (host: string) => /(^|\.)(dsbcontrol|dsbmobile|heinekingmedia)\.de$/i.test(host);
 
 interface MenuItem {
   title: string;
@@ -171,11 +171,12 @@ Deno.serve(async (req) => {
   try {
     const { menu, updated } = await getMenu(user, password);
     const plans = menu.filter((m) => m.ok).slice(0, MAX_PLANS);
-    const pages = await Promise.all(plans.map(async (p) => ({ title: p.title, html: await getPage(p.url) })));
-    const ok = pages.filter((p): p is { title: string; html: string } => p.html !== null);
+    const pages = await Promise.all(plans.map(async (p) => ({ title: p.title, url: p.url, html: await getPage(p.url) })));
+    const loaded = pages.filter((p): p is { title: string; url: string; html: string } => p.html !== null);
+    const ok = loaded.map(({ title, html }) => ({ title, html }));
     if (plans.length > 0 && ok.length === 0) return json({ error: 'dsb_unavailable' }, 502);
     // menu: was DSB angeboten hat (nur Titel, Server und Dateiname), damit man sieht, warum etwas nicht geladen wurde
-    return json({ plans: ok, updated, menu: menu.slice(0, 30).map((m) => ({ title: m.title, host: m.host, file: m.file, loaded: ok.some((p) => p.title === m.title) && m.ok })) });
+    return json({ plans: ok, updated, menu: menu.slice(0, 30).map((m) => ({ title: m.title, host: m.host, file: m.file, loaded: loaded.some((p) => p.url === m.url) })) });
   } catch (e) {
     if (e instanceof DsbError) return json({ error: e.code }, e.code === 'login_failed' ? 401 : 502);
     return json({ error: 'dsb_unavailable' }, 502);

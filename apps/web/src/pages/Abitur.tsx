@@ -1,5 +1,5 @@
 import { CONFIG, CATEGORY_LABEL, categoryFor, computeAbitur, emptyPlan, suggestPicks, type AbiturPlan, type Check } from '@study/core';
-import { AlertTriangle, ArrowLeft, Check as CheckIcon, GraduationCap, Sparkles, X } from 'lucide-react';
+import { AlertTriangle, Check as CheckIcon, GraduationCap, Sparkles, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatNumber } from '../lib/format';
@@ -110,9 +110,6 @@ export function Abitur() {
           <h1>Abiturrechner</h1>
           <p className="sub">Hessen, Gesamtqualifikation nach der OAVO (Fassung 2025): Block I aus den Kursen der Q-Phase, Block II aus den Prüfungen.</p>
         </div>
-        <Link className="btn" to="/faecher">
-          <ArrowLeft size={16} aria-hidden="true" /> Fächer
-        </Link>
       </div>
 
       <div className="card stack abi-result">

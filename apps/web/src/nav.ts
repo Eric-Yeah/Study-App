@@ -1,7 +1,8 @@
-import { CalendarDays, ClipboardCheck, GraduationCap, Home, ListChecks, NotebookPen, Settings as SettingsIcon, Timer, type LucideIcon } from 'lucide-react';
+import { CalendarDays, ClipboardCheck, GraduationCap, Home, LayoutGrid, ListChecks, NotebookPen, Settings as SettingsIcon, Timer, type LucideIcon } from 'lucide-react';
 
 /**
- * Aufbau der Navigation: acht Bereiche, sieben davon in der unteren Leiste und der Seitenleiste, Einstellungen am Handy oben in der Kopfzeile.
+ * Aufbau der Navigation: acht Bereiche. Mac und iPad zeigen alle in der Seitenleiste (Einstellungen unten).
+ * Am Handy (unter 768 px) stehen nur die Bereiche aus PHONE_BAR in der unteren Leiste, dazu „Mehr“ mit allen übrigen und den Einstellungen.
  * Jeder Bereich kann Reiter haben (SectionTabs). Welche Adresse zu welchem Bereich und Reiter gehört, steht nur hier.
  * Alte Adressen bleiben gültig: Eine Unterseite wie /korrektur/ID hält ihren Bereich in der Leiste aktiv.
  */
@@ -37,8 +38,6 @@ export interface NavArea {
   id: AreaId;
   to: string;
   label: string;
-  /** kürzere Beschriftung für die schmale untere Leiste am Handy */
-  short?: string;
   icon: LucideIcon;
   tabs?: NavTab[];
 }
@@ -61,7 +60,6 @@ export const AREAS: NavArea[] = [
     id: 'hausaufgaben',
     to: '/hausaufgaben',
     label: 'Hausaufgaben',
-    short: 'Hausaufg.',
     icon: ListChecks,
     tabs: [
       { id: 'hausaufgaben', to: '/hausaufgaben', label: 'Hausaufgaben' },
@@ -104,9 +102,27 @@ export const AREAS: NavArea[] = [
   { id: 'einstellungen', to: '/einstellungen', label: 'Einstellungen', icon: SettingsIcon },
 ];
 
-/** In der unteren Leiste und der Seitenleiste oben; Einstellungen stehen am Handy in der Kopfzeile, sonst unten in der Seitenleiste. */
+/** Oben in der Seitenleiste (Mac, iPad); die Einstellungen stehen dort unten. */
 export const MAIN_AREAS = AREAS.filter((a) => a.id !== 'einstellungen');
 export const SETTINGS_AREA = AREAS.find((a) => a.id === 'einstellungen')!;
+
+/**
+ * Handy: höchstens fünf Einträge in der unteren Leiste, damit die Namen ausgeschrieben bleiben und die Tippflächen groß.
+ * Unterwegs braucht man vor allem den Tag (Heute: Als Nächstes, Schule heute, Aufgaben), den Timer, Hausaufgaben
+ * und Notizen (Blatt fotografieren, Karteikarten). Plan, Klausuren, Noten und Einstellungen sind eher Schreibtischarbeit
+ * und stehen unter „Mehr“, erreichbar mit einem Tipp mehr, samt ihren Reitern.
+ */
+export const PHONE_BAR: AreaId[] = ['heute', 'fokus', 'hausaufgaben', 'notizen'];
+export const PHONE_BAR_AREAS = PHONE_BAR.map((id) => AREAS.find((a) => a.id === id)!);
+/** Unter „Mehr“, in der Reihenfolge von AREAS (Einstellungen zuletzt). */
+export const PHONE_MORE_AREAS = AREAS.filter((a) => !PHONE_BAR.includes(a.id));
+export const MORE_ICON = LayoutGrid;
+
+/** Welcher Eintrag der Handy-Leiste zu einem Bereich leuchtet: der Bereich selbst oder „Mehr“. */
+export function phoneSlot(area: AreaId | null): AreaId | 'mehr' | null {
+  if (!area) return null;
+  return PHONE_BAR.includes(area) ? area : 'mehr';
+}
 
 // Reihenfolge zählt: die erste passende Regel gilt (/korrektur/uebung vor /korrektur).
 const RULES: { test: RegExp; area: AreaId; tab: TabId | null }[] = [

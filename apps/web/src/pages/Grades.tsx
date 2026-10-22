@@ -21,9 +21,8 @@ import {
   type Quarter,
   type SubjectRow,
 } from '@study/core';
-import { AlertTriangle, ArrowLeft, ChevronDown, GraduationCap, Minus, Pencil, Plus, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
+import { AlertTriangle, ChevronDown, GraduationCap, Minus, Pencil, Plus, Trash2, TrendingDown, TrendingUp } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { GradeForm, draftOf, emptyDraft, type GradeDraft } from '../components/grades/GradeForm';
 import { NeededCalc } from '../components/grades/NeededCalc';
 import { Segmented } from '../components/Segmented';
@@ -148,9 +147,6 @@ export function Grades() {
           <h1>Noten</h1>
           <p className="sub">Klausuren, mündliche Mitarbeit, Tests und mehr. Daraus entsteht deine Kursnote je Halbjahr.</p>
         </div>
-        <Link className="btn btn-ghost" to="/faecher">
-          <ArrowLeft size={16} aria-hidden="true" /> Fächer
-        </Link>
       </div>
 
       <Segmented<Quarter> label="Halbjahr" value={quarter} onChange={(q) => { setQuarter(q); setMessage(null); }} options={QUARTERS.map((q) => ({ value: q, label: q }))} />

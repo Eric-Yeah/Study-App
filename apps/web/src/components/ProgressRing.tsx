@@ -5,7 +5,7 @@ export function ProgressRing({ progress, size = 240, children }: { progress: num
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
   return (
-    <div style={{ position: 'relative', width: size, height: size, maxWidth: '100%' }}>
+    <div style={{ position: 'relative', width: size, maxWidth: '100%', aspectRatio: '1 / 1' }}>
       <svg viewBox={`0 0 ${size} ${size}`} width="100%" height="100%" style={{ transform: 'rotate(-90deg)' }} aria-hidden="true">
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--line)" strokeWidth={stroke} />
         <circle

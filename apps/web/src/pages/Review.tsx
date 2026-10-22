@@ -1,7 +1,7 @@
 import { addDays, fmtMinutes, isoWeek, toIsoDate, weeklyReview } from '@study/core';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { formatDateShort } from '../lib/format';
 import { weekReviewData } from '../state/selectors';
 import { useStore } from '../state/store';
@@ -33,9 +33,6 @@ export function Review() {
             {title} · KW {isoWeek(review.weekStart)}, {formatDateShort(review.weekStart)} bis {formatDateShort(review.weekEnd)}
           </p>
         </div>
-        <Link className="btn" to="/plan">
-          Zum Plan
-        </Link>
       </div>
 
       <div className="row review-nav" style={{ gap: 8 }}>

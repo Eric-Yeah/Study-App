@@ -28,7 +28,7 @@ function SubjectChips({ subjects, value, onChange }: { subjects: Subject[]; valu
  * oder dem zuletzt gelernten Fach vorgewählt. Nach dem Speichern bleibt das Fenster offen, so geht die nächste Karte in Sekunden.
  * Taste N öffnet es am Mac, wenn gerade nicht getippt wird.
  */
-export function QuickAdd() {
+export function QuickAdd({ notOnPhone = false }: { notOnPhone?: boolean }) {
   const { state, dispatch } = useStore();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -108,7 +108,7 @@ export function QuickAdd() {
 
   return (
     <>
-      <button type="button" className="fab" aria-label="Schnell hinzufügen: Aufgabe, Karte oder Lernzeit" title="Schnell hinzufügen (Taste N)" onClick={() => show('task')}>
+      <button type="button" className={`fab${notOnPhone ? ' fab-not-phone' : ''}`} aria-label="Schnell hinzufügen: Aufgabe, Karte oder Lernzeit" title="Schnell hinzufügen (Taste N)" onClick={() => show('task')}>
         <Plus size={26} aria-hidden="true" />
       </button>
       {open && (

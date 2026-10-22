@@ -1,8 +1,31 @@
 import { useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAccess } from '../lib/access';
-import { AREAS, locate, type NavTab } from '../nav';
+import { AREAS, locate, type NavTab, type TabId } from '../nav';
 import { useStore } from '../state/store';
+
+/**
+ * Welche Reiter sichtbar sind: Reiter mit KI-Bezug nur mit Freischaltung oder vorhandenen Daten, Schwächen nur mit ausgewerteten Korrekturen.
+ * Der Reiter der aktuellen Seite ist immer sichtbar. Auch das Menü „Mehr“ am Handy nutzt diese Regel.
+ */
+export function useVisibleTabs(): (tabs: NavTab[], current?: TabId | null) => NavTab[] {
+  const { state } = useStore();
+  const access = useAccess();
+  return (tabs, current) =>
+    tabs.filter((t) => {
+      if (t.id === current) return true; // wer auf der Seite ist, sieht auch ihren Reiter
+      switch (t.gate) {
+        case 'correct':
+          return access.can('correct') || state.examReviews.length > 0;
+        case 'practice':
+          return access.can('practice') || state.practiceExams.length > 0;
+        case 'weaknesses':
+          return state.examReviews.some((r) => r.main);
+        default:
+          return true;
+      }
+    });
+}
 
 /**
  * Reiter des aktuellen Bereichs (zum Beispiel Plan, Rückblick, Lanis). Die Reiter sind echte Adressen,
@@ -11,8 +34,7 @@ import { useStore } from '../state/store';
  */
 export function SectionTabs() {
   const { pathname } = useLocation();
-  const { state } = useStore();
-  const access = useAccess();
+  const visibleTabs = useVisibleTabs();
   const { area, tab } = locate(pathname);
   const active = useRef<HTMLAnchorElement | null>(null);
 
@@ -24,20 +46,7 @@ export function SectionTabs() {
   const tabs = AREAS.find((a) => a.id === area)?.tabs;
   if (!tabs) return null;
 
-  const visible = (t: NavTab) => {
-    if (t.id === tab) return true; // wer auf der Seite ist, sieht auch ihren Reiter
-    switch (t.gate) {
-      case 'correct':
-        return access.can('correct') || state.examReviews.length > 0;
-      case 'practice':
-        return access.can('practice') || state.practiceExams.length > 0;
-      case 'weaknesses':
-        return state.examReviews.some((r) => r.main);
-      default:
-        return true;
-    }
-  };
-  const shown = tabs.filter(visible);
+  const shown = visibleTabs(tabs, tab);
   if (shown.length < 2) return null;
 
   return (

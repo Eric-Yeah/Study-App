@@ -278,17 +278,23 @@ export function subjectForCourse(course: string, subjects: { id: string; name: s
   return loose?.id ?? matchSubject(base, subjects);
 }
 
+/** Nächster Tag nach dem Eintrag (höchstens 14 Tage später), an dem das Fach laut Stundenplan stattfindet. Null ohne Stundenplan, Fach oder Treffer. */
+export function nextLessonDay(entryDate: string, subjectId: string | null, timetable: Timetable | null, subjects: { id: string; name: string }[]): string | null {
+  if (!timetable || !subjectId) return null;
+  for (let i = 1; i <= 14; i++) {
+    const day = addDays(entryDate, i);
+    if (lessonsOn(timetable, day).some((l) => matchSubject(l.abbr, subjects) === subjectId)) return day;
+  }
+  return null;
+}
+
 /**
  * Abgabetag einer Hausaufgabe: die nächste Stunde des Fachs nach dem Eintrag (höchstens 14 Tage später),
  * ohne Stundenplan oder Fach der nächste Schultag. Immer nach dem Tag des Eintrags.
  */
 export function dueDateFor(entryDate: string, subjectId: string | null, timetable: Timetable | null, subjects: { id: string; name: string }[]): string {
-  if (timetable && subjectId) {
-    for (let i = 1; i <= 14; i++) {
-      const day = addDays(entryDate, i);
-      if (lessonsOn(timetable, day).some((l) => matchSubject(l.abbr, subjects) === subjectId)) return day;
-    }
-  }
+  const lesson = nextLessonDay(entryDate, subjectId, timetable, subjects);
+  if (lesson) return lesson;
   for (let i = 1; i <= 3; i++) {
     const day = addDays(entryDate, i);
     const wd = new Date(`${day}T12:00:00Z`).getUTCDay();

@@ -35,3 +35,4 @@ export * from './dsbCheck';
 export * from './grades';
 export * from './daily';
 export * from './homework';
+export * from './homeworkEntry';

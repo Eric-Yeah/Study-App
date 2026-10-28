@@ -5,9 +5,10 @@ import { useNavigate } from 'react-router-dom';
 import { uid } from '../lib/format';
 import { likelySubjectId } from '../state/daily';
 import { useStore } from '../state/store';
+import { HomeworkComposer } from './HomeworkComposer';
 import { Segmented } from './Segmented';
 
-type Tab = 'task' | 'card' | 'learned';
+type Tab = 'homework' | 'task' | 'card' | 'learned';
 const MINUTES = [15, 25, 30, 45, 60, 90];
 
 function SubjectChips({ subjects, value, onChange }: { subjects: Subject[]; value: string | null; onChange: (id: string | null) => void }) {
@@ -24,7 +25,7 @@ function SubjectChips({ subjects, value, onChange }: { subjects: Subject[]; valu
 }
 
 /**
- * Schnell erfassen, von überall: Aufgabe, Karteikarte oder Lernzeit nachtragen. Das Fach ist aus dem Stundenplan (laufende oder letzte Stunde)
+ * Schnell erfassen, von überall: Hausaufgabe, Aufgabe, Karteikarte oder Lernzeit nachtragen. Das Fach ist aus dem Stundenplan (laufende oder letzte Stunde)
  * oder dem zuletzt gelernten Fach vorgewählt. Nach dem Speichern bleibt das Fenster offen, so geht die nächste Karte in Sekunden.
  * Taste N öffnet es am Mac, wenn gerade nicht getippt wird.
  */
@@ -62,14 +63,14 @@ export function QuickAdd({ notOnPhone = false }: { notOnPhone?: boolean }) {
       if (e.key !== 'n' || e.metaKey || e.ctrlKey || e.altKey || open) return;
       if (el && (/^(INPUT|TEXTAREA|SELECT|BUTTON|A)$/.test(el.tagName) || el.isContentEditable)) return;
       e.preventDefault();
-      show('task');
+      show('homework');
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   });
 
   useEffect(() => {
-    if (open && tab !== 'learned') first.current?.focus();
+    if (open && tab !== 'learned' && tab !== 'homework') first.current?.focus();
   }, [open, tab]);
 
   useEffect(() => () => window.clearTimeout(timeout.current), []);
@@ -108,7 +109,7 @@ export function QuickAdd({ notOnPhone = false }: { notOnPhone?: boolean }) {
 
   return (
     <>
-      <button type="button" className={`fab${notOnPhone ? ' fab-not-phone' : ''}`} aria-label="Schnell hinzufügen: Aufgabe, Karte oder Lernzeit" title="Schnell hinzufügen (Taste N)" onClick={() => show('task')}>
+      <button type="button" className={`fab${notOnPhone ? ' fab-not-phone' : ''}`} aria-label="Schnell hinzufügen: Hausaufgabe, Aufgabe, Karte oder Lernzeit" title="Schnell hinzufügen (Taste N)" onClick={() => show('homework')}>
         <Plus size={26} aria-hidden="true" />
       </button>
       {open && (
@@ -128,11 +129,14 @@ export function QuickAdd({ notOnPhone = false }: { notOnPhone?: boolean }) {
                 setSaved(null);
               }}
               options={[
+                { value: 'homework', label: 'Hausaufgabe' },
                 { value: 'task', label: 'Aufgabe' },
                 { value: 'card', label: 'Karte' },
                 { value: 'learned', label: 'Gelernt' },
               ]}
             />
+
+            {tab === 'homework' && <HomeworkComposer autoFocus />}
 
             {tab === 'task' && (
               <form

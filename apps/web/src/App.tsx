@@ -66,7 +66,7 @@ function SidebarItems() {
 }
 
 /** Seiten, auf denen der Knopf „Schnell hinzufügen“ schwebt (nicht dort, wo unten Bedienelemente liegen, zum Beispiel in Lernrunden). */
-const QUICK_ADD_ROUTES = ['/', '/fokus', '/plan', '/rueckblick', '/hausaufgaben', '/notizen', '/klausuren'];
+const QUICK_ADD_ROUTES = ['/', '/fokus', '/plan', '/rueckblick', '/notizen', '/klausuren'];
 /** Dort nur auf iPad und Mac: am Handy lägen Start und Überspringen des Timers unter dem Knopf. */
 const QUICK_ADD_NOT_ON_PHONE = ['/fokus'];
 

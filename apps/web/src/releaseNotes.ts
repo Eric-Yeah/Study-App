@@ -12,6 +12,14 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '2026.10.28.2',
+    date: '28. Oktober 2026',
+    items: [
+      { icon: '✍️', title: 'Hausaufgaben in einer Zeile eintragen', text: 'Oben auf der Seite Hausaufgaben tippst du einfach los, zum Beispiel „Mathe S. 45 Nr. 3 bis Freitag“, und drückst Enter. Fach und Frist erkennt die App aus dem Text („bis morgen“, „bis Mi“, „12.11.“, „nächste Stunde“). Ohne Angabe ist das Fach der laufenden oder letzten Stunde vorgewählt und die Abgabe die nächste Stunde dieses Fachs aus deinem Stundenplan. Mit den Chips änderst du Fach und Tag mit einem Tipp, das Feld bleibt für die nächste Hausaufgabe offen.' },
+      { icon: '📋', title: 'Eine Liste für alles', text: 'Selbst eingetragene und aus Lanis geholte Hausaufgaben stehen zusammen in der Liste, nach Abgabetag geordnet, und erscheinen auch als Aufgaben auf Heute. Auch ohne Lanis ist die Seite jetzt nützlich. Das Plus unten rechts hat dafür einen neuen Reiter „Hausaufgabe“ (Taste N am Mac).' },
+    ],
+  },
+  {
     version: '2026.10.28.1',
     date: '28. Oktober 2026',
     items: [

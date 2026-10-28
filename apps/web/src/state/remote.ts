@@ -41,6 +41,9 @@ const examRow = (userId: string, e: Exam) => ({
   total_hours_manual: e.totalHoursManual,
   start_days_manual: e.startDaysManual,
   external_id: e.externalId ?? null,
+  lanis_date: e.lanisDate ?? null,
+  lanis_notice: e.lanisNotice ?? null,
+  lanis_ack: e.lanisAck ?? null,
 });
 
 const taskRow = (userId: string, t: Task) => ({
@@ -333,6 +336,9 @@ export async function loadRemote(
       totalHoursManual: r.total_hours_manual,
       startDaysManual: r.start_days_manual,
       externalId: r.external_id,
+      lanisDate: r.lanis_date ?? null,
+      lanisNotice: r.lanis_notice ?? null,
+      lanisAck: r.lanis_ack ?? null,
     })),
     plan: pl.data
       ? { freeDaysPerWeek: pl.data.free_days_per_week as 0 | 1 | 2, dailyLimitMin: pl.data.daily_limit_min }

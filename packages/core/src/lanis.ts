@@ -84,7 +84,32 @@ export function matchSubject(abbr: string, subjects: Pick<Subject, 'id' | 'name'
   return found?.id ?? null;
 }
 
-export type ImportStatus = 'new' | 'known' | 'changed';
+export type ImportStatus = 'new' | 'known' | 'changed' | 'kept';
+
+/** Hat der Nutzer das Datum einer aus Lanis stammenden Klausur selbst verlegt? Ohne bekanntes Lanis-Datum lässt sich das nicht sagen. */
+export function dateIsOwn(e: Pick<Exam, 'date' | 'lanisDate' | 'externalId'>): boolean {
+  return Boolean(e.externalId) && Boolean(e.lanisDate) && e.date !== e.lanisDate;
+}
+
+/**
+ * Gleicht eine bekannte Klausur mit dem Lanis-Kalender ab. Ein selbst verlegter Termin hat Vorrang: Lanis ändert dann
+ * nur das gemerkte Lanis-Datum. Der Hinweis (lanisNotice) wird je Lanis-Datum nur einmal gesetzt, solange noch keiner kam.
+ */
+export function reconcileExam(existing: Exam, lanisDate: string): { exam: Exam; status: Exclude<ImportStatus, 'new'> } {
+  if (existing.date === lanisDate) {
+    return { exam: { ...existing, lanisDate, lanisNotice: null }, status: 'known' };
+  }
+  if (dateIsOwn(existing)) {
+    const notify = existing.lanisAck !== lanisDate && existing.lanisNotice !== lanisDate;
+    return { exam: { ...existing, lanisDate, lanisNotice: notify ? lanisDate : (existing.lanisNotice ?? null) }, status: 'kept' };
+  }
+  return { exam: { ...existing, date: lanisDate, lanisDate, lanisNotice: null }, status: 'changed' };
+}
+
+/** Offener Hinweis: Lanis nennt ein anderes Datum, der eigene Termin gilt weiter. */
+export function pendingNotice(e: Exam): string | null {
+  return dateIsOwn(e) && e.lanisNotice && e.lanisNotice === e.lanisDate ? e.lanisNotice : null;
+}
 
 export interface ImportItem {
   lanis: LanisExam;
@@ -110,7 +135,7 @@ export function planImport(
     items.push({
       lanis,
       subjectId: existing?.subjectId ?? matchSubject(lanis.abbr, subjects),
-      status: !existing ? 'new' : existing.date === lanis.date ? 'known' : 'changed',
+      status: existing ? reconcileExam(existing, lanis.date).status : 'new',
       existing,
     });
   }

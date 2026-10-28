@@ -1,4 +1,4 @@
-import { planExam, toIsoDate, type Exam } from '@study/core';
+import { dateIsOwn, planExam, toIsoDate, type Exam } from '@study/core';
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { OverridableSlider } from '../components/OverridableSlider';
@@ -6,7 +6,7 @@ import { PlainSlider } from '../components/PlainSlider';
 import { Segmented } from '../components/Segmented';
 import { Timeline } from '../components/Timeline';
 import { Topics } from '../components/Topics';
-import { formatDays, formatHours, formatMinutes, formatNumber, uid } from '../lib/format';
+import { formatDateShort, formatDays, formatHours, formatMinutes, formatNumber, uid } from '../lib/format';
 import { useStore } from '../state/store';
 import { useAccess } from '../lib/access';
 
@@ -93,6 +93,14 @@ export function ExamEditor() {
           <label className="field">
             <span>Datum</span>
             <input className="input" type="date" value={draft.date} onChange={(e) => set({ date: e.target.value, startDaysManual: null })} />
+            {validDate && dateIsOwn(draft) && (
+              <span className="hint">
+                Im Lanis-Kalender steht der {formatDateShort(draft.lanisDate ?? '')}. Dein Datum hat Vorrang, Lanis überschreibt es nicht.{' '}
+                <button type="button" className="link-btn" onClick={() => set({ date: draft.lanisDate ?? draft.date, startDaysManual: null })}>
+                  Lanis-Datum nehmen
+                </button>
+              </span>
+            )}
           </label>
 
           {plan && (

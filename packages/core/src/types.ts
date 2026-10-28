@@ -32,6 +32,12 @@ export interface Exam {
   startDaysManual: number | null;
   /** Herkunft bei importierten Klausuren (Lanis-Id), damit ein erneuter Import nichts doppelt anlegt. */
   externalId?: string | null;
+  /** Letztes Datum dieser Klausur im Lanis-Kalender. Weicht `date` davon ab, hat der Nutzer sie selbst verlegt und das Datum hat Vorrang. */
+  lanisDate?: string | null;
+  /** Lanis-Datum, das die App zugunsten des eigenen Termins ignoriert hat und über das noch ein Hinweis aussteht. */
+  lanisNotice?: string | null;
+  /** Lanis-Datum, über das der Nutzer schon informiert wurde (damit der Hinweis nur einmal kommt). */
+  lanisAck?: string | null;
 }
 
 export interface PlanSettings {

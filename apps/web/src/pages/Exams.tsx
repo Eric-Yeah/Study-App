@@ -1,6 +1,7 @@
 import { Download, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ExamCards } from '../components/ExamCards';
+import { LanisDateNotice } from '../components/LanisDateNotice';
 
 /** Klausuren: Termine mit Fortschritt (Bereich Klausuren). Korrektur, Übung und Schwächen sind die weiteren Reiter. */
 export function Exams() {
@@ -20,6 +21,7 @@ export function Exams() {
           </Link>
         </div>
       </div>
+      <LanisDateNotice />
       <ExamCards />
     </div>
   );

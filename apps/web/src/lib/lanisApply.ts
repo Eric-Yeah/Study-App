@@ -9,6 +9,7 @@ import {
   parseSubstitutions,
   parseTimetable,
   planImport,
+  reconcileExam,
   readDsbPlans,
   toIsoDate,
   type AbsenceReport,
@@ -121,9 +122,12 @@ export function readAbsences(html: string | null | undefined): AbsenceReport | n
   return html ? parseAbsences(extractAbsenceTable(html) ?? html) : null;
 }
 
-/** Klausur aus einem Lanis-Eintrag. Bei einer schon importierten Klausur ändert sich nur das Datum und das Fach. */
+/**
+ * Klausur aus einem Lanis-Eintrag, wenn der Nutzer sie im Import ausdrücklich wählt: Bei einer schon importierten Klausur
+ * ändert sich nur das Datum (auch ein selbst verlegtes, das ist dann gewollt) und das Fach.
+ */
 export function buildExam(item: ImportItem, subjectId: string, subjects: Pick<Subject, 'id' | 'name'>[]): Exam {
-  if (item.existing) return { ...item.existing, date: item.lanis.date, subjectId };
+  if (item.existing) return { ...item.existing, date: item.lanis.date, lanisDate: item.lanis.date, lanisNotice: null, subjectId };
   const subject = subjects.find((s) => s.id === subjectId);
   return {
     id: uid(),
@@ -134,13 +138,15 @@ export function buildExam(item: ImportItem, subjectId: string, subjects: Pick<Su
     totalHoursManual: null,
     startDaysManual: null,
     externalId: item.lanis.externalId,
+    lanisDate: item.lanis.date,
   };
 }
 
 /**
  * Übernimmt eine Lanis-Antwort ohne Rückfrage (automatische Aktualisierung):
  * Stundenplan und Vertretungen ersetzen den alten Stand, neue Klausuren mit passendem Fach werden angelegt,
- * bei bekannten Klausuren ändert sich nur ein verschobenes Datum. Eigene Werte bleiben unberührt.
+ * bei bekannten Klausuren ändert sich nur ein in Lanis verschobenes Datum. Eigene Werte bleiben unberührt, auch ein
+ * selbst verlegter Termin: der hat Vorrang, die App merkt sich nur das Lanis-Datum und einmal einen Hinweis (reconcileExam).
  */
 export function applyLanis(
   data: LanisResponse,
@@ -207,7 +213,15 @@ export function applyLanis(
   }
   if (data.events) {
     for (const item of planImport(data.events, ctx.subjects, ctx.exams, toIsoDate(new Date()))) {
-      if (item.status === 'known' || !item.subjectId) continue;
+      if (!item.subjectId) continue;
+      if (item.existing) {
+        const { exam, status } = reconcileExam(item.existing, item.lanis.date);
+        const same = exam.date === item.existing.date && exam.lanisDate === item.existing.lanisDate && (exam.lanisNotice ?? null) === (item.existing.lanisNotice ?? null);
+        if (same) continue;
+        ctx.dispatch({ type: 'upsertExam', exam });
+        if (status === 'changed') exams++;
+        continue;
+      }
       ctx.dispatch({ type: 'upsertExam', exam: buildExam(item, item.subjectId, ctx.subjects) });
       exams++;
     }

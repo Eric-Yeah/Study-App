@@ -35,7 +35,7 @@ async function errorMessage(error: unknown): Promise<string> {
   return (code && LANIS_ERRORS[code]) || 'Der Import ist fehlgeschlagen. Ist die Funktion lanis-calendar in Supabase eingerichtet?';
 }
 
-const STATUS_LABEL = { new: 'neu', known: 'schon importiert', changed: 'Datum geändert' } as const;
+const STATUS_LABEL = { new: 'neu', known: 'schon importiert', changed: 'Datum geändert', kept: 'von dir verlegt' } as const;
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
@@ -81,7 +81,7 @@ export function LanisImport() {
     setPlans({ timetable: timetable && timetable.lessons.length > 0 ? timetable : null, subs, absences: absences && hasAbsences(absences) ? absences : null, errors: data.errors ?? {} });
     setItems(list);
     setSubjectFor(Object.fromEntries(list.map((i) => [i.lanis.externalId, i.subjectId ?? ''])));
-    setSelected(Object.fromEntries(list.map((i) => [i.lanis.externalId, i.status !== 'known' && i.subjectId !== null])));
+    setSelected(Object.fromEntries(list.map((i) => [i.lanis.externalId, i.status !== 'known' && i.status !== 'kept' && i.subjectId !== null])));
   };
 
   const chosen = (items ?? []).filter((i) => selected[i.lanis.externalId] && subjectFor[i.lanis.externalId]);
@@ -242,6 +242,7 @@ export function LanisImport() {
                   <div className="hint">
                     {STATUS_LABEL[i.status]}
                     {i.status === 'changed' && i.existing ? `, bisher ${formatDateShort(i.existing.date)}` : ''}
+                    {i.status === 'kept' && i.existing ? `, bleibt am ${formatDateShort(i.existing.date)}, anhaken übernimmt das Lanis-Datum` : ''}
                   </div>
                 </div>
                 <select

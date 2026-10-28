@@ -12,6 +12,13 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '2026.10.28.1',
+    date: '28. Oktober 2026',
+    items: [
+      { icon: '📅', title: 'Dein Klausurtermin hat Vorrang', text: 'Wenn du eine Klausur selbst auf einen anderen Tag legst, setzt die automatische Aktualisierung aus Lanis sie nicht mehr zurück. Die App merkt sich nur, was Lanis nennt. Einmal meldet sie sich auf Heute und unter Klausuren mit einem kleinen Hinweis („dein Termin bleibt“), dort kannst du ihn mit „Verstanden“ schließen oder das Lanis-Datum übernehmen. Erst wenn Lanis ein weiteres, neues Datum nennt, kommt wieder ein Hinweis. Im Klausur-Editor steht unter dem Datum, was Lanis sagt.' },
+    ],
+  },
+  {
     version: '2026.10.22.11',
     date: '22. Oktober 2026',
     items: [

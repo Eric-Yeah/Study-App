@@ -1,21 +1,23 @@
 import type { DayKind } from '@study/core';
+import { useMode } from '../lib/mode';
 
 const LABELS: Record<DayKind, string> = {
   study: 'Lernen',
   review: 'Wiederholen',
   free: 'Frei',
-  exam: 'Klausur',
+  exam: 'Prüfung/Klausur',
   none: 'Kein Plan',
 };
 
 export function Timeline({ days, showLegend = true }: { days: DayKind[]; showLegend?: boolean }) {
+  const { terms } = useMode();
   const counts = days.reduce<Record<string, number>>((acc, d) => ({ ...acc, [d]: (acc[d] ?? 0) + 1 }), {});
-  const summary = `Zeitleiste: ${counts.study ?? 0} Lerntage, ${counts.review ?? 0} Wiederholungstage, ${counts.free ?? 0} freie Tage, dann die Klausur`;
+  const summary = `Zeitleiste: ${counts.study ?? 0} Lerntage, ${counts.review ?? 0} Wiederholungstage, ${counts.free ?? 0} freie Tage, dann die ${terms.exam}`;
   return (
     <div className="stack" style={{ gap: 8 }}>
       <div className="timeline" role="img" aria-label={summary}>
         {days.map((d, i) => (
-          <span key={i} className={`tl-${d}`} title={LABELS[d]} />
+          <span key={i} className={`tl-${d}`} title={d === 'exam' ? terms.exam : LABELS[d]} />
         ))}
       </div>
       {showLegend && (
@@ -34,7 +36,7 @@ export function Timeline({ days, showLegend = true }: { days: DayKind[]; showLeg
           </span>
           <span>
             <i className="tl-exam" />
-            Klausur
+            {terms.exam}
           </span>
         </div>
       )}

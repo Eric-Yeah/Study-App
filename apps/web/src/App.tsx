@@ -17,7 +17,15 @@ import { SectionTabs } from './components/SectionTabs';
 import { QuickAdd } from './components/QuickAdd';
 import { TimerPill } from './components/TimerPill';
 import { PhoneNav } from './components/PhoneNav';
-import { MAIN_AREAS, SETTINGS_AREA, locate } from './nav';
+import { locate, mainAreasFor, settingsAreaFor } from './nav';
+import { ByMode } from './components/ByMode';
+import { useMode } from './lib/mode';
+import { Deadlines } from './pages/Deadlines';
+import { Modules } from './pages/Modules';
+import { Schedule } from './pages/Schedule';
+import { StudyGrades } from './pages/StudyGrades';
+import { Tasks } from './pages/Tasks';
+import { StudyProfilePage } from './pages/StudyProfilePage';
 import { Grades } from './pages/Grades';
 import { StylePage } from './pages/StylePage';
 import { Focus } from './pages/Focus';
@@ -48,9 +56,10 @@ const LOGO = `${import.meta.env.BASE_URL}favicon.svg`;
 function SidebarItems() {
   const { pathname } = useLocation();
   const current = locate(pathname).area;
+  const { mode } = useMode();
   return (
     <>
-      {[...MAIN_AREAS, SETTINGS_AREA].map(({ id, to, label, icon: Icon }) => (
+      {[...mainAreasFor(mode), settingsAreaFor(mode)].map(({ id, to, label, icon: Icon }) => (
         <Link
           key={id}
           to={to}
@@ -66,7 +75,7 @@ function SidebarItems() {
 }
 
 /** Seiten, auf denen der Knopf „Schnell hinzufügen“ schwebt (nicht dort, wo unten Bedienelemente liegen, zum Beispiel in Lernrunden). */
-const QUICK_ADD_ROUTES = ['/', '/fokus', '/plan', '/rueckblick', '/hausaufgaben', '/notizen', '/klausuren'];
+const QUICK_ADD_ROUTES = ['/', '/fokus', '/plan', '/rueckblick', '/notizen', '/klausuren', '/stundenplan', '/fristen'];
 /** Dort nur auf iPad und Mac: am Handy lägen Start und Überspringen des Timers unter dem Knopf. */
 const QUICK_ADD_NOT_ON_PHONE = ['/fokus'];
 
@@ -149,15 +158,18 @@ export function App() {
               <Route path="plan" element={<Plan />} />
               <Route path="notizen" element={<Notes />} />
               <Route path="karten" element={<Cards />} />
-              <Route path="hausaufgaben" element={<Homework />} />
-              <Route path="arbeitsblaetter" element={<Worksheets />} />
+              <Route path="hausaufgaben" element={<ByMode school={<Homework />} uni={<Tasks />} />} />
+              <Route path="arbeitsblaetter" element={<ByMode school={<Worksheets />} uni={<Navigate to="/hausaufgaben" replace />} />} />
               <Route path="klausuren" element={<Exams />} />
               <Route path="rueckblick" element={<Review />} />
-              <Route path="faecher" element={<Subjects />} />
-              <Route path="abitur" element={<Abitur />} />
-              <Route path="noten" element={<Grades />} />
+              <Route path="faecher" element={<ByMode school={<Subjects />} uni={<Modules />} />} />
+              <Route path="abitur" element={<ByMode school={<Abitur />} uni={<Navigate to="/noten" replace />} />} />
+              <Route path="noten" element={<ByMode school={<Grades />} uni={<StudyGrades />} />} />
+              <Route path="studiengang" element={<StudyProfilePage />} />
+              <Route path="stundenplan" element={<Schedule />} />
+              <Route path="fristen" element={<Deadlines />} />
               <Route path="einstellungen" element={<Settings />} />
-              <Route path="import" element={<LanisImport />} />
+              <Route path="import" element={<ByMode school={<LanisImport />} uni={<Navigate to="/plan" replace />} />} />
               <Route path="klausur/neu" element={<ExamEditor key="new" />} />
               <Route path="klausur/:id" element={<ExamEditor />} />
               <Route path="korrektur" element={<Corrections />} />

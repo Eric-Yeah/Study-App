@@ -21,6 +21,7 @@ const suites = [
   ['lanis-calendar', 'lanis.mjs'],
   ['dsb-plan', 'dsb.mjs'],
   ['fitness-ingest', 'fitness.mjs'],
+  ['ical-fetch', 'ical.mjs'],
 ];
 const only = process.argv[2];
 let failed = 0;

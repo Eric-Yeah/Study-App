@@ -55,6 +55,23 @@ export interface PushExam {
   behind: boolean; // zurück oder weit zurück
 }
 
+/** Frist aus dem Studium (Rückmeldung, Anmeldung, BAföG, Abgabe): erinnert `remindDays` Tage vorher und am Tag davor. */
+export interface PushDeadline {
+  id: string;
+  title: string;
+  date: string; // YYYY-MM-DD
+  remindDays: number;
+}
+
+/** Wie die Mitteilungen eine Prüfung nennen: Klausur in der Schule, Prüfung im Studium. */
+export interface PushWords {
+  exam: string;
+  exams: string;
+}
+
+export const SCHOOL_WORDS: PushWords = { exam: 'Klausur', exams: 'Klausuren' };
+export const UNI_WORDS: PushWords = { exam: 'Prüfung', exams: 'Prüfungen' };
+
 export type PushKind = 'plan' | 'exam' | 'behind' | 'test';
 
 export interface PushItem {
@@ -88,8 +105,9 @@ const inDays = (n: number) => (n === 0 ? 'heute' : n === 1 ? 'morgen' : `in ${n}
  * morgen (danach ändert sich der Plan zu oft), "Klausur naht" 7, 3 und 1 Tag vorher, "Rückstand" nur heute Abend für die dringendste
  * Klausur. Jede Mitteilung enthält nur, was für den Tag stimmt.
  */
-export function buildPushItems(input: { now: Date; today: string; days: PushDay[]; exams: PushExam[]; prefs: PushPrefs }): PushItem[] {
+export function buildPushItems(input: { now: Date; today: string; days: PushDay[]; exams: PushExam[]; prefs: PushPrefs; deadlines?: PushDeadline[]; words?: PushWords }): PushItem[] {
   const { now, today, days, exams, prefs } = input;
+  const w = input.words ?? SCHOOL_WORDS;
   const out: PushItem[] = [];
   const future = (d: Date) => d.getTime() > now.getTime() + 30_000;
   const upcoming = exams.filter((e) => e.date >= today).sort((a, b) => a.date.localeCompare(b.date));
@@ -106,9 +124,9 @@ export function buildPushItems(input: { now: Date; today: string; days: PushDay[
       const cards = day?.cards ?? 0;
       const cardsLine = cards > 0 ? ` Dazu ${cards} ${cards === 1 ? 'Karte' : 'Karten'} zum Wiederholen.` : '';
       const next = upcoming.find((e) => e.date > date);
-      const nextLine = next ? ` Nächste Klausur: ${next.subject} ${inDays(dayDiff(date, next.date))}.` : '';
+      const nextLine = next ? ` Nächste ${w.exam}: ${next.subject} ${inDays(dayDiff(date, next.date))}.` : '';
       if (examToday) {
-        out.push({ kind: 'plan', dueAt: due.toISOString(), title: `${label} Klausur in ${examToday.subject}`, body: `Viel Erfolg! Schlaf gut, iss etwas und geh ruhig in die Klausur.`, url: `/klausur/${examToday.id}` });
+        out.push({ kind: 'plan', dueAt: due.toISOString(), title: `${label} ${w.exam} in ${examToday.subject}`, body: `Viel Erfolg! Schlaf gut, iss etwas und geh ruhig in die ${w.exam}.`, url: `/klausur/${examToday.id}` });
       } else if (total > 0 && day) {
         const subjects = day.blocks.slice(0, CONFIG.push.maxSubjects).map((b) => `${b.subject} ${pushMinutes(b.minutes)}`);
         const more = day.blocks.length > CONFIG.push.maxSubjects ? ` und ${day.blocks.length - CONFIG.push.maxSubjects} weitere` : '';
@@ -134,21 +152,39 @@ export function buildPushItems(input: { now: Date; today: string; days: PushDay[
         const due = at(addDays(e.date, -lead), prefs.examTime);
         if (!future(due) || left > lead + 14) continue;
         const open = e.remainingMin > 0 ? `Laut Plan sind noch etwa ${pushMinutes(e.remainingMin)} offen.` : 'Laut Plan bist du fertig, wiederhole nur noch.';
-        out.push({ kind: 'exam', dueAt: due.toISOString(), title: `${e.subject}: Klausur ${lead === 1 ? 'morgen' : `in ${lead} Tagen`}`, body: open, url: `/klausur/${e.id}` });
+        out.push({ kind: 'exam', dueAt: due.toISOString(), title: `${e.subject}: ${w.exam} ${lead === 1 ? 'morgen' : `in ${lead} Tagen`}`, body: open, url: `/klausur/${e.id}` });
       }
     }
     const due = at(today, prefs.examTime);
     const behind = upcoming.filter((e) => e.behind && e.behindMin > 0 && e.date > today);
     if (future(due) && behind.length > 0) {
       const first = behind[0]!;
-      const others = behind.length > 1 ? ` Außerdem hinten: ${behind.length - 1} weitere ${behind.length === 2 ? 'Klausur' : 'Klausuren'}.` : '';
+      const others = behind.length > 1 ? ` Außerdem hinten: ${behind.length - 1} weitere ${behind.length === 2 ? w.exam : w.exams}.` : '';
       out.push({
         kind: 'behind',
         dueAt: due.toISOString(),
         title: `Du liegst bei ${first.subject} zurück`,
-        body: `${pushMinutes(first.behindMin)} hinter dem Plan, die Klausur ist ${inDays(dayDiff(today, first.date))}. Heute noch ein Block hilft.${others}`,
+        body: `${pushMinutes(first.behindMin)} hinter dem Plan, die ${w.exam} ist ${inDays(dayDiff(today, first.date))}. Heute noch ein Block hilft.${others}`,
         url: `/klausur/${first.id}`,
       });
+    }
+  }
+  if (prefs.exam) {
+    for (const d of input.deadlines ?? []) {
+      if (d.date < today) continue;
+      const left = dayDiff(today, d.date);
+      for (const lead of new Set([d.remindDays, 1])) {
+        if (left < lead || lead < 0) continue;
+        const due = at(addDays(d.date, -lead), prefs.examTime);
+        if (!future(due) || left > lead + 14) continue;
+        out.push({
+          kind: 'exam',
+          dueAt: due.toISOString(),
+          title: `Frist ${lead === 0 ? 'heute' : lead === 1 ? 'morgen' : `in ${lead} Tagen`}: ${d.title}`,
+          body: 'Prüf kurz, ob alles erledigt ist. Die genauen Regeln stehen bei deiner Hochschule.',
+          url: '/fristen',
+        });
+      }
     }
   }
   return out.sort((a, b) => a.dueAt.localeCompare(b.dueAt));

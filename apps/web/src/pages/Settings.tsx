@@ -17,12 +17,15 @@ import { formatMinutes } from '../lib/format';
 import { useStore, type Theme } from '../state/store';
 import { useAccess } from '../lib/access';
 import { DeleteAccount } from '../components/DeleteAccount';
+import { ModeCard } from '../components/ModeCard';
+import { useMode } from '../lib/mode';
 import { StorageCleanup } from '../components/StorageCleanup';
 
 export function Settings() {
   const { state, dispatch } = useStore();
   const { user, signOut } = useAuth();
   const access = useAccess();
+  const { isUni } = useMode();
   const [pwOpen, setPwOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
   const taps = useRef<TapState>(NO_TAPS);
@@ -51,6 +54,8 @@ export function Settings() {
         />
       </div>
 
+      <ModeCard />
+
       {state.profile && (
         <div className="card stack">
           <h2>Profil</h2>
@@ -58,16 +63,22 @@ export function Settings() {
             <span>Name</span>
             <input className="input" value={state.profile.name} onChange={(e) => dispatch({ type: 'updateProfile', profile: { name: e.target.value } })} />
           </label>
-          <div className="field">
-            <span>Stufe</span>
-            <Segmented<Stage>
-              label="Stufe"
-              value={state.profile.stage}
-              onChange={(stage) => dispatch({ type: 'updateProfile', profile: { stage } })}
-              options={(['E', 'Q1', 'Q2', 'Q3', 'Q4'] as Stage[]).map((s) => ({ value: s, label: s }))}
-            />
-          </div>
-          <p className="hint">Bundesland: {state.profile.federalState}</p>
+          {isUni ? (
+            <p className="hint">Studiengang, Startsemester und Semesterzeiten stehen unter Studium → Studiengang.</p>
+          ) : (
+            <>
+              <div className="field">
+                <span>Stufe</span>
+                <Segmented<Stage>
+                  label="Stufe"
+                  value={state.profile.stage}
+                  onChange={(stage) => dispatch({ type: 'updateProfile', profile: { stage } })}
+                  options={(['E', 'Q1', 'Q2', 'Q3', 'Q4'] as Stage[]).map((s) => ({ value: s, label: s }))}
+                />
+              </div>
+              <p className="hint">Bundesland: {state.profile.federalState}</p>
+            </>
+          )}
         </div>
       )}
 
@@ -90,7 +101,7 @@ export function Settings() {
           label="Tageslimit für echte Lernzeit"
           value={state.plan.dailyLimitMin}
           min={60}
-          max={240}
+          max={isUni ? 480 : 240}
           step={15}
           format={formatMinutes}
           onChange={(dailyLimitMin) => dispatch({ type: 'setPlan', plan: { dailyLimitMin } })}
@@ -127,9 +138,9 @@ export function Settings() {
 
       <DevicesCard />
 
-      <LanisAutoCard />
+      {!isUni && <LanisAutoCard />}
 
-      <DsbCard />
+      {!isUni && <DsbCard />}
 
       <TimerSoundCard />
 
@@ -154,7 +165,7 @@ export function Settings() {
 
       <div className="card stack">
         <h2>Daten</h2>
-        <p className="muted">Löscht alle Fächer, Klausuren, Sessions und Aufgaben in deinem Konto. Das Konto bleibt bestehen.</p>
+        <p className="muted">Löscht alle Fächer und Module, Prüfungen und Klausuren, Ergebnisse, Sessions und Aufgaben in deinem Konto, in Schule und Studium. Das Konto bleibt bestehen.</p>
         <button
           type="button"
           className="btn btn-danger"

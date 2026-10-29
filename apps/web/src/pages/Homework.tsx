@@ -7,18 +7,20 @@ import {
   fileKey,
   formatBytes,
   importableType,
+  isOwnHomework,
   subjectForCourse,
   toIsoDate,
   type HomeworkFile,
   type HomeworkItem,
 } from '@study/core';
-import { Check, Download, FileText, RefreshCw } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { Check, Download, FileText, RefreshCw, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { formatAgendaDay, formatDateShort } from '../lib/format';
 import { useLanisAuto } from '../lib/lanisAuto';
 import { setPendingUpload } from '../lib/lanisFiles';
-import { useStore } from '../state/store';
+import { HomeworkComposer } from '../components/HomeworkComposer';
+import { useStore, type Task } from '../state/store';
 
 const FILES_DAYS = 30; // so weit zurück zeigt die Liste der Arbeitsblätter zuerst
 const HOMEWORK_DAYS = 21; // Hausaufgaben bleiben so lange sichtbar
@@ -55,14 +57,15 @@ function useHomework() {
   return { state, dispatch, auto, today, items, subjectOf, taskFor, dueOf };
 }
 
-function Header({ title, sub, auto, stand }: { title: string; sub: string; auto: ReturnType<typeof useLanisAuto>; stand: string | null }) {
+function Header({ title, sub, auto, stand, children }: { title: string; sub: string; auto: ReturnType<typeof useLanisAuto>; stand: string | null; children?: ReactNode }) {
   return (
     <>
       <div className="page-head">
         <div>
           <h1>{title}</h1>
           <p className="sub">
-            {sub} Stand: {ago(stand)}.
+            {sub}
+            {auto.enabled ? ` Stand: ${ago(stand)}.` : ''}
           </p>
         </div>
         {auto.enabled && (
@@ -72,11 +75,13 @@ function Header({ title, sub, auto, stand }: { title: string; sub: string; auto:
         )}
       </div>
 
+      {children}
+
       {!auto.enabled && (
         <div className="card stack">
-          <h2>Mit Lanis verbinden</h2>
+          <h2>Mit Lanis verbinden (optional)</h2>
           <p className="muted">
-            Damit die App Hausaufgaben und Arbeitsblätter aus Lanis holen kann, muss die automatische Aktualisierung an sein (beim Import „Auf diesem Gerät merken“ wählen). Dein Passwort bleibt verschlüsselt auf diesem Gerät.
+            Damit die App Hausaufgaben und Arbeitsblätter auch aus Lanis holen kann, muss die automatische Aktualisierung an sein (beim Import „Auf diesem Gerät merken“ wählen). Dein Passwort bleibt verschlüsselt auf diesem Gerät.
           </p>
           <div>
             <Link className="btn btn-primary" to="/import">
@@ -94,21 +99,36 @@ function Header({ title, sub, auto, stand }: { title: string; sub: string; auto:
   );
 }
 
-/** Hausaufgaben aus den Kursmappen in Lanis, nach Abgabetag geordnet. */
+/** Eine Zeile der Liste: eine Hausaufgabe aus Lanis oder eine selbst eingetragene. */
+interface Row {
+  key: string;
+  due: string;
+  done: boolean;
+  item: HomeworkItem | null; // aus Lanis
+  task: Task | null; // Aufgabe in der App (eigene Hausaufgabe, oder die zur Lanis-Hausaufgabe)
+}
+
+/** Hausaufgaben: selbst eingetragene und aus den Kursmappen in Lanis, nach Abgabetag geordnet. */
 export function Homework() {
   const { state, dispatch, auto, today, items, subjectOf, taskFor, dueOf } = useHomework();
 
   const cut = addDays(today, -HOMEWORK_DAYS);
-  const all = items.filter((i) => i.text && i.date >= cut);
+  const lanis = items.filter((i) => i.text && i.date >= cut);
   const isDone = (i: HomeworkItem) => taskFor(i)?.done ?? i.done;
-  // Offen: alles mit Aufgabe in der App, ohne Aufgabe nur, wenn die Abgabe noch nicht lange her ist
-  const open = all
-    .filter((i) => !isDone(i) && (taskFor(i) || dueOf(i) >= addDays(today, -RECENT_DAYS)))
-    .map((i) => ({ item: i, due: dueOf(i) }))
-    .sort((a, b) => a.due.localeCompare(b.due) || a.item.course.localeCompare(b.item.course));
-  const finished = all.filter(isDone).sort((a, b) => b.date.localeCompare(a.date));
+  const lanisRows: Row[] = lanis.map((i) => ({ key: i.key, due: dueOf(i), done: isDone(i), item: i, task: taskFor(i) ?? null }));
+  const ownRows: Row[] = state.tasks.filter(isOwnHomework).map((t) => ({ key: t.id, due: t.date, done: t.done, item: null, task: t }));
 
-  const groups: { key: string; kind: ReturnType<typeof dueGroup>; due: string; rows: typeof open }[] = [];
+  const subjectName = (r: Row) => (r.item ? subjectOf(r.item)?.name ?? r.item.course : state.subjects.find((s) => s.id === r.task?.subjectId)?.name ?? '');
+  // Offen: Eigene immer, aus Lanis mit Aufgabe in der App oder wenn die Abgabe noch nicht lange her ist
+  const open = [...lanisRows, ...ownRows]
+    .filter((r) => !r.done && (r.task || r.due >= addDays(today, -RECENT_DAYS)))
+    .sort((a, b) => a.due.localeCompare(b.due) || subjectName(a).localeCompare(subjectName(b)));
+  const finished = [...lanisRows, ...ownRows]
+    .filter((r) => r.done)
+    .sort((a, b) => b.due.localeCompare(a.due))
+    .slice(0, 60);
+
+  const groups: { key: string; kind: ReturnType<typeof dueGroup>; due: string; rows: Row[] }[] = [];
   for (const row of open) {
     const kind = dueGroup(row.due, today);
     const key = kind === 'day' ? row.due : kind;
@@ -121,14 +141,15 @@ export function Homework() {
   const lateCount = open.filter((r) => r.due < today).length;
   const todayCount = open.filter((r) => r.due === today).length;
 
-  const card = (item: HomeworkItem, due: string, done: boolean) => {
-    const task = taskFor(item);
-    const subject = subjectOf(item);
+  const card = (r: Row) => {
+    const { item, task, done, due } = r;
+    const subject = item ? subjectOf(item) : state.subjects.find((s) => s.id === task?.subjectId) ?? null;
+    const name = subject?.name ?? item?.course ?? 'Hausaufgabe';
     const info = dueInfo(due, today);
     return (
-      <div key={item.key} className={`card hw-card${done ? ' is-done' : ''}`} style={{ '--subject': subject?.color ?? 'var(--accent)' } as CSSProperties}>
+      <div key={r.key} className={`card hw-card${done ? ' is-done' : ''}`} style={{ '--subject': subject?.color ?? 'var(--accent)' } as CSSProperties}>
         {task ? (
-          <button type="button" className="check" role="checkbox" aria-checked={done} aria-label={`Hausaufgabe ${subject?.name ?? item.course} erledigt`} onClick={() => dispatch({ type: 'toggleTask', id: task.id })}>
+          <button type="button" className="check" role="checkbox" aria-checked={done} aria-label={`Hausaufgabe ${name} erledigt`} onClick={() => dispatch({ type: 'toggleTask', id: task.id })}>
             {done && <Check size={14} aria-hidden="true" />}
           </button>
         ) : (
@@ -138,75 +159,89 @@ export function Homework() {
         )}
         <div className="hw-body">
           <div className="hw-head">
-            <strong className="hw-subject">{subject?.name ?? item.course}</strong>
+            <strong className="hw-subject">{name}</strong>
             {!done && <span className={`due ${info.tone}`}>{info.label}</span>}
           </div>
-          <span className="hw-meta">
-            {done ? '' : `Fällig ${formatDateShort(due)} · `}Eintrag vom {formatDateShort(item.date)}
-            {item.slot ? `, ${item.slot}` : ''}
-            {item.topic ? ` · ${item.topic}` : ''}
-          </span>
-          <span className={`hw-text${done ? ' done-text' : ''}`}>{item.text}</span>
-          {item.done && <span className="hw-meta">In Lanis als erledigt markiert.</span>}
+          {item ? (
+            <>
+              <span className="hw-meta">
+                {done ? '' : `Fällig ${formatDateShort(due)} · `}Eintrag vom {formatDateShort(item.date)}
+                {item.slot ? `, ${item.slot}` : ''}
+                {item.topic ? ` · ${item.topic}` : ''}
+              </span>
+              <span className={`hw-text${done ? ' done-text' : ''}`}>{item.text}</span>
+              {item.done && <span className="hw-meta">In Lanis als erledigt markiert.</span>}
+            </>
+          ) : (
+            <>
+              <span className={`hw-text${done ? ' done-text' : ''}`}>{task?.title}</span>
+              <span className="hw-meta">Fällig {formatDateShort(due)} · selbst eingetragen</span>
+            </>
+          )}
         </div>
+        {!item && task && (
+          <button type="button" className="btn btn-ghost btn-icon" aria-label={`Hausaufgabe ${name} löschen`} onClick={() => dispatch({ type: 'deleteTask', id: task.id })}>
+            <Trash2 size={16} aria-hidden="true" />
+          </button>
+        )}
       </div>
     );
   };
 
   return (
     <div className="stack" style={{ gap: 20 }}>
-      <Header title="Hausaufgaben" sub="Aus deinen Kursmappen in Lanis, nach Abgabetag geordnet." auto={auto} stand={state.homeworkAt} />
+      <Header title="Hausaufgaben" sub="Selbst eingetragen und aus Lanis, nach Abgabetag geordnet." auto={auto} stand={state.homeworkAt}>
+        <div className="card">
+          <HomeworkComposer />
+        </div>
+      </Header>
 
       {auto.enabled && !state.homework && !auto.busy && (
         <p className="notice" role="status">
-          Noch nichts geladen. Tippe auf „Jetzt aktualisieren“, dann liest die App deine Kursmappen.
+          Aus Lanis ist noch nichts geladen. Tippe auf „Jetzt aktualisieren“, dann liest die App deine Kursmappen.
         </p>
       )}
 
-      {state.homework && (
-        <>
-          <div className="hw-summary">
-            <div className="hw-stat">
-              <strong>{open.length}</strong>
-              <span>offen</span>
-            </div>
-            <div className={`hw-stat${lateCount > 0 ? ' late' : ''}`}>
-              <strong>{lateCount}</strong>
-              <span>überfällig</span>
-            </div>
-            <div className={`hw-stat${todayCount > 0 ? ' today' : ''}`}>
-              <strong>{todayCount}</strong>
-              <span>heute fällig</span>
-            </div>
+      <div className="hw-summary">
+        <div className="hw-stat">
+          <strong>{open.length}</strong>
+          <span>offen</span>
+        </div>
+        <div className={`hw-stat${lateCount > 0 ? ' late' : ''}`}>
+          <strong>{lateCount}</strong>
+          <span>überfällig</span>
+        </div>
+        <div className={`hw-stat${todayCount > 0 ? ' today' : ''}`}>
+          <strong>{todayCount}</strong>
+          <span>heute fällig</span>
+        </div>
+      </div>
+
+      {groups.length === 0 ? (
+        <div className="card stack" style={{ alignItems: 'center', textAlign: 'center' }}>
+          <h2>Alles erledigt</h2>
+          <p className="muted">Keine offenen Hausaufgaben. Neue trägst du oben in einer Zeile ein, sie erscheinen auch als Aufgaben auf Heute.</p>
+        </div>
+      ) : (
+        groups.map((g) => (
+          <section key={g.key} className="hw-group" aria-label={groupTitle(g)}>
+            <h2 className={`hw-group-title ${g.kind}`}>
+              {groupTitle(g)} <span className="hw-count">{g.rows.length}</span>
+            </h2>
+            {g.rows.map(card)}
+          </section>
+        ))
+      )}
+
+      {finished.length > 0 && (
+        <details className="hw-group">
+          <summary className="hw-group-title" style={{ cursor: 'pointer' }}>
+            Erledigt <span className="hw-count">{finished.length}</span>
+          </summary>
+          <div className="hw-group" style={{ marginTop: 10 }}>
+            {finished.map(card)}
           </div>
-
-          {groups.length === 0 ? (
-            <div className="card stack" style={{ alignItems: 'center', textAlign: 'center' }}>
-              <h2>Alles erledigt</h2>
-              <p className="muted">Keine offenen Hausaufgaben. Neue legt die App auch als Aufgaben auf Heute an.</p>
-            </div>
-          ) : (
-            groups.map((g) => (
-              <section key={g.key} className="hw-group" aria-label={groupTitle(g)}>
-                <h2 className={`hw-group-title ${g.kind}`}>
-                  {groupTitle(g)} <span className="hw-count">{g.rows.length}</span>
-                </h2>
-                {g.rows.map((r) => card(r.item, r.due, false))}
-              </section>
-            ))
-          )}
-
-          {finished.length > 0 && (
-            <details className="hw-group">
-              <summary className="hw-group-title" style={{ cursor: 'pointer' }}>
-                Erledigt <span className="hw-count">{finished.length}</span>
-              </summary>
-              <div className="hw-group" style={{ marginTop: 10 }}>
-                {finished.map((i) => card(i, dueOf(i), true))}
-              </div>
-            </details>
-          )}
-        </>
+        </details>
       )}
     </div>
   );

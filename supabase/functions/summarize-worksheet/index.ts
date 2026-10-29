@@ -196,11 +196,13 @@ Deno.serve(async (req) => {
     if (!note) throw new Failure('not_found');
     // Unterrichtssprache des Fachs: Englisch bei Englisch und bilingualen Fächern, usw. (ohne Fach: Deutsch)
     let language = 'de';
+    let audience: 'school' | 'uni' = 'school';
     if (note.subject_id) {
-      const { data: subject } = await userDb.from('subjects').select('language').eq('id', note.subject_id).maybeSingle();
+      const { data: subject } = await userDb.from('subjects').select('language, scope').eq('id', note.subject_id).maybeSingle();
       if (subject?.language) language = String(subject.language);
+      if (subject?.scope === 'uni') audience = 'uni';
     }
-    const systemPrompt = summaryPrompt(CONFIG.ai.summaryLimits, languageRule(language));
+    const systemPrompt = summaryPrompt(CONFIG.ai.summaryLimits, languageRule(language), audience);
 
     // Jedes Bild muss zu dieser Notiz gehören (worksheet_files), nicht nur zum Nutzer.
     const paths = [...new Set(pages.filter((p) => p.type === 'image').map((p) => (p as { path: string }).path))];

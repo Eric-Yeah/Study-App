@@ -8,10 +8,11 @@ import { Segmented } from '../components/Segmented';
 import { uid } from '../lib/format';
 import { DEFAULT_SUBJECTS, SUBJECT_COLORS, TYPE_LABELS } from '../state/defaults';
 import { useStore } from '../state/store';
+import { StudyOnboarding } from './StudyOnboarding';
 
 const ROLES: { value: Role; label: string; hint: string }[] = [
   { value: 'student_school', label: 'Schüler/in am Gymnasium', hint: 'Mit Leistungskursen und Abitur-Logik' },
-  { value: 'student_university', label: 'Student/in', hint: 'Abitur-Logik wird ausgeblendet (folgt später)' },
+  { value: 'student_university', label: 'Student/in', hint: 'Module mit ECTS, Prüfungen, Stundenplan und Fristen' },
   { value: 'other', label: 'Andere', hint: 'Nur Plan und Timer' },
 ];
 const STAGES: Stage[] = ['E', 'Q1', 'Q2', 'Q3', 'Q4'];
@@ -37,6 +38,7 @@ export function Onboarding() {
   const [name, setName] = useState('');
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [custom, setCustom] = useState('');
+  const [uni, setUni] = useState(false);
 
   const selected = (n: string) => drafts.some((d) => d.name === n);
   const toggleSubject = (n: string, type: Subject['type']) =>
@@ -80,6 +82,8 @@ export function Onboarding() {
     });
     navigate('/');
   };
+
+  if (uni) return <StudyOnboarding name={name} onBack={() => setUni(false)} />;
 
   const canNext = step !== 2 || drafts.length > 0;
   const steps = ['Wer bist du?', 'Wo und wann?', 'Deine Fächer', 'Leistungskurse und Prüfungsfächer', 'Noten und Schwierigkeit'];
@@ -231,7 +235,7 @@ export function Onboarding() {
             Zurück
           </button>
           {step < steps.length - 1 ? (
-            <button className="btn btn-primary" type="button" disabled={!canNext} onClick={() => canNext && setStep((s) => s + 1)}>
+            <button className="btn btn-primary" type="button" disabled={!canNext} onClick={() => canNext && (step === 0 && role === 'student_university' ? setUni(true) : setStep((s) => s + 1))}>
               Weiter
             </button>
           ) : (

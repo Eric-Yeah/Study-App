@@ -1,9 +1,10 @@
-import { CONFIG, addDays, buildQueue, toIsoDate, type PushDay, type PushExam } from '@study/core';
+import { CONFIG, SCHOOL_WORDS, UNI_WORDS, addDays, allDeadlines, buildQueue, toIsoDate, type PushDay, type PushDeadline, type PushExam, type PushWords } from '@study/core';
 import { blocksForDate, combinedPlan, examsWithPlans, learnedForExam, realityFor, upcoming } from '../state/selectors';
+import { modeOf } from '../state/scope';
 import type { AppState } from '../state/store';
 
 /** Was die Erinnerungen aus dem Plan brauchen: die Blöcke der nächsten Tage und der Stand der kommenden Klausuren. */
-export function pushInputFrom(state: AppState, now: Date): { today: string; days: PushDay[]; exams: PushExam[] } {
+export function pushInputFrom(state: AppState, now: Date): { today: string; days: PushDay[]; exams: PushExam[]; deadlines: PushDeadline[]; words: PushWords } {
   const today = toIsoDate(now);
   const list = examsWithPlans(state, now);
   const plan = combinedPlan(state, list, now);
@@ -25,5 +26,12 @@ export function pushInputFrom(state: AppState, now: Date): { today: string; days
       behind: reality.status === 'behind' || reality.status === 'far_behind',
     };
   });
-  return { today, days, exams };
+  const uni = modeOf(state) === 'university';
+  // Fristen (Studium): eigene und aus den Prüfungen, erledigte nicht
+  const deadlines: PushDeadline[] = uni
+    ? allDeadlines(state.deadlines, state.exams, state.subjects, today)
+        .filter((d) => !d.done)
+        .map((d) => ({ id: d.id, title: d.title, date: d.date, remindDays: d.remindDays }))
+    : [];
+  return { today, days, exams, deadlines, words: uni ? UNI_WORDS : SCHOOL_WORDS };
 }

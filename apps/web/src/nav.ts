@@ -1,3 +1,4 @@
+import type { AppMode } from '@study/core';
 import { CalendarDays, ClipboardCheck, GraduationCap, Home, LayoutGrid, ListChecks, NotebookPen, Settings as SettingsIcon, Timer, type LucideIcon } from 'lucide-react';
 
 /**
@@ -22,7 +23,10 @@ export type TabId =
   | 'schwaechen'
   | 'noten'
   | 'abitur'
-  | 'faecher';
+  | 'faecher'
+  | 'stundenplan'
+  | 'fristen'
+  | 'studiengang';
 
 /** Wann ein Reiter erscheint: immer, oder nur mit Freischaltung oder vorhandenen Daten (entschieden in SectionTabs). */
 export type TabGate = 'correct' | 'practice' | 'weaknesses';
@@ -42,6 +46,7 @@ export interface NavArea {
   tabs?: NavTab[];
 }
 
+/** Schule (Lanis, Abitur). Das Studium hat eigene Bereiche, siehe UNI_AREAS. */
 export const AREAS: NavArea[] = [
   { id: 'heute', to: '/', label: 'Heute', icon: Home },
   { id: 'fokus', to: '/fokus', label: 'Fokus', icon: Timer },
@@ -102,26 +107,82 @@ export const AREAS: NavArea[] = [
   { id: 'einstellungen', to: '/einstellungen', label: 'Einstellungen', icon: SettingsIcon },
 ];
 
+/**
+ * Studium: dieselben Bereichs-Ids und Adressen, andere Namen und Reiter. Kein Lanis, keine Hausaufgaben aus Lanis, keine Hessen-Korrektur,
+ * kein Abiturrechner. Neu sind Stundenplan, Fristen und der Studiengang.
+ */
+export const UNI_AREAS: NavArea[] = [
+  { id: 'heute', to: '/', label: 'Heute', icon: Home },
+  { id: 'fokus', to: '/fokus', label: 'Fokus', icon: Timer },
+  {
+    id: 'plan',
+    to: '/plan',
+    label: 'Plan',
+    icon: CalendarDays,
+    tabs: [
+      { id: 'plan', to: '/plan', label: 'Plan' },
+      { id: 'stundenplan', to: '/stundenplan', label: 'Stundenplan' },
+      { id: 'fristen', to: '/fristen', label: 'Fristen' },
+      { id: 'rueckblick', to: '/rueckblick', label: 'Rückblick' },
+    ],
+  },
+  { id: 'hausaufgaben', to: '/hausaufgaben', label: 'Aufgaben', icon: ListChecks },
+  {
+    id: 'notizen',
+    to: '/notizen',
+    label: 'Notizen',
+    icon: NotebookPen,
+    tabs: [
+      { id: 'notizen', to: '/notizen', label: 'Notizen' },
+      { id: 'karten', to: '/karten', label: 'Karteikarten' },
+    ],
+  },
+  { id: 'klausuren', to: '/klausuren', label: 'Prüfungen', icon: ClipboardCheck },
+  {
+    id: 'noten',
+    to: '/noten',
+    label: 'Studium',
+    icon: GraduationCap,
+    tabs: [
+      { id: 'noten', to: '/noten', label: 'Noten' },
+      { id: 'faecher', to: '/faecher', label: 'Module' },
+      { id: 'studiengang', to: '/studiengang', label: 'Studiengang' },
+    ],
+  },
+  { id: 'einstellungen', to: '/einstellungen', label: 'Einstellungen', icon: SettingsIcon },
+];
+
+export function areasFor(mode: AppMode): NavArea[] {
+  return mode === 'university' ? UNI_AREAS : AREAS;
+}
+
 /** Oben in der Seitenleiste (Mac, iPad); die Einstellungen stehen dort unten. */
 export const MAIN_AREAS = AREAS.filter((a) => a.id !== 'einstellungen');
 export const SETTINGS_AREA = AREAS.find((a) => a.id === 'einstellungen')!;
+export const mainAreasFor = (mode: AppMode) => areasFor(mode).filter((a) => a.id !== 'einstellungen');
+export const settingsAreaFor = (mode: AppMode) => areasFor(mode).find((a) => a.id === 'einstellungen')!;
 
 /**
  * Handy: höchstens fünf Einträge in der unteren Leiste, damit die Namen ausgeschrieben bleiben und die Tippflächen groß.
- * Unterwegs braucht man vor allem den Tag (Heute: Als Nächstes, Schule heute, Aufgaben), den Timer, Hausaufgaben
+ * Schule: Unterwegs braucht man vor allem den Tag (Heute: Als Nächstes, Schule heute, Aufgaben), den Timer, Hausaufgaben
  * und Notizen (Blatt fotografieren, Karteikarten). Plan, Klausuren, Noten und Einstellungen sind eher Schreibtischarbeit
  * und stehen unter „Mehr“, erreichbar mit einem Tipp mehr, samt ihren Reitern.
+ * Studium: Hausaufgaben sind nicht der Alltag, dafür der Plan mit Stundenplan und Fristen.
  */
 export const PHONE_BAR: AreaId[] = ['heute', 'fokus', 'hausaufgaben', 'notizen'];
-export const PHONE_BAR_AREAS = PHONE_BAR.map((id) => AREAS.find((a) => a.id === id)!);
+export const PHONE_BAR_UNI: AreaId[] = ['heute', 'fokus', 'plan', 'notizen'];
+export const phoneBarIds = (mode: AppMode): AreaId[] => (mode === 'university' ? PHONE_BAR_UNI : PHONE_BAR);
+export const phoneBarAreasFor = (mode: AppMode) => phoneBarIds(mode).map((id) => areasFor(mode).find((a) => a.id === id)!);
 /** Unter „Mehr“, in der Reihenfolge von AREAS (Einstellungen zuletzt). */
-export const PHONE_MORE_AREAS = AREAS.filter((a) => !PHONE_BAR.includes(a.id));
+export const phoneMoreAreasFor = (mode: AppMode) => areasFor(mode).filter((a) => !phoneBarIds(mode).includes(a.id));
+export const PHONE_BAR_AREAS = phoneBarAreasFor('school');
+export const PHONE_MORE_AREAS = phoneMoreAreasFor('school');
 export const MORE_ICON = LayoutGrid;
 
 /** Welcher Eintrag der Handy-Leiste zu einem Bereich leuchtet: der Bereich selbst oder „Mehr“. */
-export function phoneSlot(area: AreaId | null): AreaId | 'mehr' | null {
+export function phoneSlot(area: AreaId | null, mode: AppMode = 'school'): AreaId | 'mehr' | null {
   if (!area) return null;
-  return PHONE_BAR.includes(area) ? area : 'mehr';
+  return phoneBarIds(mode).includes(area) ? area : 'mehr';
 }
 
 // Reihenfolge zählt: die erste passende Regel gilt (/korrektur/uebung vor /korrektur).
@@ -131,6 +192,9 @@ const RULES: { test: RegExp; area: AreaId; tab: TabId | null }[] = [
   { test: /^\/plan(\/|$)/, area: 'plan', tab: 'plan' },
   { test: /^\/rueckblick(\/|$)/, area: 'plan', tab: 'rueckblick' },
   { test: /^\/import(\/|$)/, area: 'plan', tab: 'lanis' },
+  { test: /^\/stundenplan(\/|$)/, area: 'plan', tab: 'stundenplan' },
+  { test: /^\/fristen(\/|$)/, area: 'plan', tab: 'fristen' },
+  { test: /^\/studiengang(\/|$)/, area: 'noten', tab: 'studiengang' },
   { test: /^\/notizen(\/|$)/, area: 'notizen', tab: 'notizen' },
   { test: /^\/karten(\/|$)/, area: 'notizen', tab: 'karten' },
   { test: /^\/hausaufgaben(\/|$)/, area: 'hausaufgaben', tab: 'hausaufgaben' },

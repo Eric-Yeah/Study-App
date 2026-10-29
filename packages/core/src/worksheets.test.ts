@@ -400,15 +400,15 @@ describe('mergeSummaries', () => {
 
 describe('gemeinsamer Code für die Edge Functions', () => {
   it('die Kopien unter supabase/functions/_shared sind aktuell (npm run sync:shared)', () => {
-    for (const name of ['config.ts', 'worksheets.ts', 'cardsAi.ts', 'languages.ts', 'examGrading.ts', 'practiceExam.ts', 'topics.ts', 'taskStyle.ts', 'access.ts']) {
+    for (const name of ['config.ts', 'worksheets.ts', 'cardsAi.ts', 'languages.ts', 'examGrading.ts', 'practiceExam.ts', 'topics.ts', 'taskStyle.ts', 'access.ts', 'icalUrl.ts']) {
       const source = readFileSync(new URL(`./${name}`, import.meta.url), 'utf8');
       const copy = readFileSync(new URL(`../../../supabase/functions/_shared/${name}`, import.meta.url), 'utf8');
       expect(copy, `${name} ist veraltet, bitte npm run sync:shared ausführen`).toBe(source);
     }
   });
 
-  it('worksheets.ts, cardsAi.ts, languages.ts, examGrading.ts, practiceExam.ts, topics.ts, taskStyle.ts und access.ts importieren nichts, sonst läuft es in Deno nicht', () => {
-    for (const name of ['worksheets.ts', 'cardsAi.ts', 'languages.ts', 'examGrading.ts', 'practiceExam.ts', 'topics.ts', 'taskStyle.ts', 'access.ts']) {
+  it('worksheets.ts, cardsAi.ts, languages.ts, examGrading.ts, practiceExam.ts, topics.ts, taskStyle.ts, access.ts und icalUrl.ts importieren nichts, sonst läuft es in Deno nicht', () => {
+    for (const name of ['worksheets.ts', 'cardsAi.ts', 'languages.ts', 'examGrading.ts', 'practiceExam.ts', 'topics.ts', 'taskStyle.ts', 'access.ts', 'icalUrl.ts']) {
       const source = readFileSync(new URL(`./${name}`, import.meta.url), 'utf8');
       expect(source, name).not.toMatch(/^\s*import\s/m);
     }
@@ -436,6 +436,11 @@ describe('summaryPrompt', () => {
 
   it('hängt die Sprachregel an, wenn eine gesetzt ist, sonst bleibt der Prompt gleich', () => {
     expect(summaryPrompt(CONFIG.ai.summaryLimits, '')).toBe(prompt);
+    expect(summaryPrompt(CONFIG.ai.summaryLimits, '', 'school')).toBe(prompt);
+    const uni = summaryPrompt(CONFIG.ai.summaryLimits, '', 'uni');
+    expect(uni).toContain('Studierende');
+    expect(uni).not.toContain('Schülerinnen');
+    expect(uni.split('\n').slice(1)).toEqual(prompt.split('\n').slice(1));
     const withRule = summaryPrompt(CONFIG.ai.summaryLimits, languageRule('en'));
     expect(withRule.startsWith(prompt)).toBe(true);
     expect(withRule).toContain('Englisch');

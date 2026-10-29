@@ -8,6 +8,7 @@ import { SchoolDay } from '../components/SchoolDay';
 import { CardsDueCard } from '../components/today/CardsDueCard';
 import { NextUpCard } from '../components/today/NextUpCard';
 import { PushNudge } from '../components/today/PushNudge';
+import { LanisDateNotice } from '../components/LanisDateNotice';
 import { StreakRow } from '../components/today/StreakRow';
 import { formatDateLong, formatDateShort, formatDays, formatMinutes, uid } from '../lib/format';
 import { minutesBySubject, nextUpFor, openTasksFor } from '../state/daily';
@@ -162,6 +163,8 @@ export function Today() {
           {next.kind !== 'cards' && <CardsDueCard />}
         </div>
       </div>
+
+      <LanisDateNotice />
 
       <SchoolDay />
 

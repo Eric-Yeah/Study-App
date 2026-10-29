@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isLanisExam, matchSubject, parseLanisExam, planImport, type LanisEvent } from './lanis';
+import { dateIsOwn, isLanisExam, matchSubject, parseLanisExam, pendingNotice, planImport, reconcileExam, type LanisEvent } from './lanis';
 import type { Exam } from './types';
 
 const ev = (Id: string, title: string, start: string, code = 'Q1M03-GYM'): LanisEvent => ({
@@ -93,5 +93,57 @@ describe('planImport', () => {
   it('behält das Fach einer schon importierten Klausur', () => {
     const items = planImport([events[1]], subjects, [exam({ externalId: 'a', subjectId: 'e' })], '2026-10-06');
     expect(items[0].subjectId).toBe('e');
+  });
+});
+
+describe('reconcileExam: eigener Termin hat Vorrang', () => {
+  const synced = exam({ externalId: 'a', date: '2026-12-08', lanisDate: '2026-12-08' });
+
+  it('folgt Lanis, solange der Nutzer nichts verlegt hat', () => {
+    const r = reconcileExam(synced, '2026-12-10');
+    expect(r.status).toBe('changed');
+    expect(r.exam).toMatchObject({ date: '2026-12-10', lanisDate: '2026-12-10', lanisNotice: null });
+  });
+
+  it('ohne bekanntes Lanis-Datum gilt wie bisher das von Lanis', () => {
+    expect(reconcileExam(exam({ externalId: 'a', date: '2026-12-09' }), '2026-12-08').exam.date).toBe('2026-12-08');
+  });
+
+  it('behält das selbst verlegte Datum und meldet es einmal', () => {
+    const mine = exam({ externalId: 'a', date: '2026-12-15', lanisDate: '2026-12-08' });
+    expect(dateIsOwn(mine)).toBe(true);
+    const first = reconcileExam(mine, '2026-12-08');
+    expect(first.status).toBe('kept');
+    expect(first.exam.date).toBe('2026-12-15');
+    expect(pendingNotice(first.exam)).toBe('2026-12-08');
+    // weitere Abrufe ändern nichts mehr
+    expect(reconcileExam(first.exam, '2026-12-08').exam).toEqual(first.exam);
+  });
+
+  it('nach "Verstanden" kommt für dasselbe Lanis-Datum kein Hinweis mehr', () => {
+    const acked = exam({ externalId: 'a', date: '2026-12-15', lanisDate: '2026-12-08', lanisNotice: null, lanisAck: '2026-12-08' });
+    const r = reconcileExam(acked, '2026-12-08');
+    expect(r.status).toBe('kept');
+    expect(pendingNotice(r.exam)).toBeNull();
+  });
+
+  it('ein neues Lanis-Datum meldet sich einmal, der eigene Termin bleibt', () => {
+    const acked = exam({ externalId: 'a', date: '2026-12-15', lanisDate: '2026-12-08', lanisAck: '2026-12-08' });
+    const r = reconcileExam(acked, '2026-12-11');
+    expect(r.exam).toMatchObject({ date: '2026-12-15', lanisDate: '2026-12-11' });
+    expect(pendingNotice(r.exam)).toBe('2026-12-11');
+  });
+
+  it('stimmt Lanis später mit dem eigenen Termin überein, endet der Vorrang ohne Hinweis', () => {
+    const mine = exam({ externalId: 'a', date: '2026-12-15', lanisDate: '2026-12-08', lanisNotice: '2026-12-08' });
+    const r = reconcileExam(mine, '2026-12-15');
+    expect(r.status).toBe('known');
+    expect(dateIsOwn(r.exam)).toBe(false);
+    expect(pendingNotice(r.exam)).toBeNull();
+  });
+
+  it('planImport meldet einen selbst verlegten Termin als kept', () => {
+    const items = planImport([ev('a', 'M Q1 Klausur', '2026-12-08T09:55:00+01:00')], subjects, [exam({ externalId: 'a', date: '2026-12-15', lanisDate: '2026-12-08' })], '2026-10-06');
+    expect(items[0].status).toBe('kept');
   });
 });

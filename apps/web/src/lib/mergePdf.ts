@@ -40,7 +40,7 @@ async function photoToJpeg(file: File): Promise<{ bytes: Uint8Array; width: numb
  * PDF-Seiten werden unverändert übernommen (Text bleibt Text), Fotos kommen auf eine A4-Seite.
  * pdf-lib wird erst hier nachgeladen.
  */
-export async function mergeToPdf(files: File[], onProgress?: (done: number, total: number, name: string) => void): Promise<MergedPdf> {
+export async function mergeToPdf(files: File[], onProgress?: (done: number, total: number, name: string) => void, maxPages: number = CONFIG.pdf.maxPages): Promise<MergedPdf> {
   if (files.length === 0) throw new Error('Wähle zuerst Dateien aus.');
   const { PDFDocument } = await import('pdf-lib');
   const out = await PDFDocument.create();
@@ -65,8 +65,8 @@ export async function mergeToPdf(files: File[], onProgress?: (done: number, tota
     } else {
       throw new Error(`„${file.name}“ ist weder ein Bild noch eine PDF.`);
     }
-    if (out.getPageCount() > CONFIG.pdf.maxPages) {
-      throw new Error(`Das sind mehr als ${CONFIG.pdf.maxPages} Seiten. Füge weniger auf einmal zusammen.`);
+    if (out.getPageCount() > maxPages) {
+      throw new Error(`Das sind mehr als ${maxPages} Seiten. Füge weniger auf einmal zusammen.`);
     }
   }
 

@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAccess } from '../lib/access';
-import { AREAS, locate, type NavTab, type TabId } from '../nav';
+import { areasFor, locate, type NavTab, type TabId } from '../nav';
+import { useMode } from '../lib/mode';
 import { useStore } from '../state/store';
 
 /**
@@ -36,6 +37,7 @@ export function SectionTabs() {
   const { pathname } = useLocation();
   const visibleTabs = useVisibleTabs();
   const { area, tab } = locate(pathname);
+  const { mode } = useMode();
   const active = useRef<HTMLAnchorElement | null>(null);
 
   useEffect(() => {
@@ -43,7 +45,7 @@ export function SectionTabs() {
     active.current?.scrollIntoView?.({ inline: 'center', block: 'nearest' });
   }, [tab]);
 
-  const tabs = AREAS.find((a) => a.id === area)?.tabs;
+  const tabs = areasFor(mode).find((a) => a.id === area)?.tabs;
   if (!tabs) return null;
 
   const shown = visibleTabs(tabs, tab);

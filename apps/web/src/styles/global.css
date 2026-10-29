@@ -4056,3 +4056,62 @@ a.chip {
     margin-right: auto;
   }
 }
+
+/* Studium: Wochenansicht des Stundenplans */
+.week-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 10px;
+}
+.week-day {
+  background: var(--surface);
+  border: var(--bw, 1px) solid var(--line);
+  border-radius: 12px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.week-day.today {
+  border-color: var(--accent);
+}
+.week-day h3 {
+  font-size: 14px;
+}
+.week-event {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-left: 4px solid var(--line-strong);
+  padding-left: 8px;
+  min-width: 0;
+}
+.week-event.blocked {
+  opacity: 0.7;
+  background: repeating-linear-gradient(135deg, transparent 0 6px, var(--line) 6px 7px);
+}
+.week-event-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  text-align: left;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 1099px) {
+  .week-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 767px) {
+  .week-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

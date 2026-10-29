@@ -1,4 +1,5 @@
 import {
+  CONFIG,
   QUARTERS,
   formatBytes,
   initialPages,
@@ -26,6 +27,7 @@ import { mergeToPdf, type MergedPdf } from '../lib/mergePdf';
 import { applyPageEdits, renderThumbnails } from '../lib/pdfEdit';
 import { dropImagesIfSure, removeDocument, removeNoteImages, summarizeWorksheet, uploadDocument, uploadWorksheetImages } from '../lib/worksheetApi';
 import { preparePages, type Progress } from '../lib/worksheetFiles';
+import { useMode } from '../lib/mode';
 import { useStore, type LessonNote } from '../state/store';
 import { useAccess } from '../lib/access';
 import { clearPendingUpload, peekPendingUpload } from '../lib/lanisFiles';
@@ -67,6 +69,7 @@ export interface Created {
  */
 export function NoteUpload({ onCreated, onSettled }: { onCreated: (c: Created) => void; onSettled: () => void }) {
   const { state, dispatch, flush } = useStore();
+  const { isUni, terms } = useMode();
   const userId = useUserId();
   const today = toIsoDate(new Date());
 
@@ -115,12 +118,12 @@ export function NoteUpload({ onCreated, onSettled }: { onCreated: (c: Created) =
 
   // Lehrkraft und Q-Phase vorschlagen: aus dem Stundenplan, sonst die Q-Phase der neuesten Notiz. Eigene Eingaben bleiben.
   useEffect(() => {
-    if (!touched.teacher) setTeacher(teacherFor(state.timetable, subjectId, state.subjects, date));
-    if (!touched.quarter) {
+    if (!touched.teacher) setTeacher(isUni ? state.subjects.find((x) => x.id === subjectId)?.lecturer ?? '' : teacherFor(state.timetable, subjectId, state.subjects, date));
+    if (!touched.quarter && !isUni) {
       const lastQuarter = [...state.notes].sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? '')).find((n) => n.quarter)?.quarter ?? '';
       setQuarter(quarterFor(state.timetable, subjectId, state.subjects) ?? lastQuarter);
     }
-  }, [subjectId, date, state.timetable, state.subjects, state.notes, touched]);
+  }, [subjectId, date, state.timetable, state.subjects, state.notes, touched, isUni]);
 
   useEffect(() => () => void (built && URL.revokeObjectURL(built.url)), [built]);
 
@@ -200,7 +203,7 @@ export function NoteUpload({ onCreated, onSettled }: { onCreated: (c: Created) =
     setBusy(true);
     setError(null);
     try {
-      const merged = await mergeToPdf(files, (done, total, label) => setProgress({ done, total, label }));
+      const merged = await mergeToPdf(files, (done, total, label) => setProgress({ done, total, label }), isUni ? CONFIG.study.pdf.maxPages : undefined);
       setBuilt({ ...merged, url: URL.createObjectURL(merged.blob) });
       setEdits(initialPages(merged.pages));
     } catch (e) {
@@ -220,7 +223,7 @@ export function NoteUpload({ onCreated, onSettled }: { onCreated: (c: Created) =
   }); // eslint-disable-line react-hooks/exhaustive-deps
 
   const upload = async () => {
-    if (!built || !finalPdf || !quarter) return;
+    if (!built || !finalPdf || (!isUni && !quarter)) return;
     setBusy(true);
     setError(null);
     const noteId = uid();
@@ -231,11 +234,18 @@ export function NoteUpload({ onCreated, onSettled }: { onCreated: (c: Created) =
       let prepared = null as Awaited<ReturnType<typeof preparePages>> | null;
       let message = '';
       if (useAi && access.can('summarize')) {
-        prepared = await preparePages(files, state.notes.flatMap((n) => n.fileHashes), setProgress);
-        message = skippedSummary(prepared.skipped);
-        if (prepared.pages.length === 0) {
+        try {
+          prepared = await preparePages(files, state.notes.flatMap((n) => n.fileHashes), setProgress);
+          message = skippedSummary(prepared.skipped);
+          if (prepared.pages.length === 0) {
+            prepared = null;
+            message = `Nichts an die KI geschickt: ${message || 'auf den Seiten war nichts zu lesen.'}`;
+          }
+        } catch (e) {
+          // Skripte sind oft länger, als die KI auf einmal liest: Im Studium bleibt die Notiz mit dem PDF, nur ohne Zusammenfassung
+          if (!isUni) throw e;
           prepared = null;
-          message = `Nichts an die KI geschickt: ${message || 'auf den Seiten war nichts zu lesen.'}`;
+          message = `${e instanceof Error ? e.message : 'Die KI-Zusammenfassung ging nicht.'} Die Notiz wird ohne Zusammenfassung gespeichert.`;
         }
       }
 
@@ -396,11 +406,11 @@ export function NoteUpload({ onCreated, onSettled }: { onCreated: (c: Created) =
   }
 
   // Schritt 1: Stunde angeben, Dateien wählen und zusammenfügen
-  const canBuild = subjectId !== '' && quarter !== '' && files.length > 0 && !busy;
+  const canBuild = subjectId !== '' && (isUni || quarter !== '') && files.length > 0 && !busy;
   if (state.subjects.length === 0) {
     return (
       <div className="card stack upload-card" data-no-reload>
-        <p className="muted">Lege zuerst unter Fächer ein Fach an.</p>
+        <p className="muted">{isUni ? 'Lege zuerst unter Studium → Module ein Modul an.' : 'Lege zuerst unter Fächer ein Fach an.'}</p>
       </div>
     );
   }
@@ -411,8 +421,8 @@ export function NoteUpload({ onCreated, onSettled }: { onCreated: (c: Created) =
       <section className="stack upload-section">
         <h3 className="section-title">Zu welcher Stunde?</h3>
         <div className="stack" style={{ gap: 6 }}>
-          <span className="form-label">Fach</span>
-          <div className="chip-grid" role="group" aria-label="Fach">
+          <span className="form-label">{terms.subject}</span>
+          <div className="chip-grid" role="group" aria-label={terms.subject}>
             {state.subjects.map((sub) => (
               <button key={sub.id} type="button" className="chip" aria-pressed={subjectId === sub.id} disabled={busy} onClick={() => setSubjectId(sub.id)}>
                 <i className="dot" style={{ background: sub.color }} />
@@ -428,11 +438,11 @@ export function NoteUpload({ onCreated, onSettled }: { onCreated: (c: Created) =
             <input className="input" type="date" value={date} max={today} onChange={(e) => setDate(e.target.value)} disabled={busy} />
           </label>
           <label className="field">
-            <span>Lehrkraft</span>
+            <span>{isUni ? 'Dozent/in' : 'Lehrkraft'}</span>
             <input
               className="input"
               value={teacher}
-              placeholder="zum Beispiel Müller"
+              placeholder={isUni ? 'zum Beispiel Prof. Müller' : 'zum Beispiel Müller'}
               maxLength={40}
               onChange={(e) => {
                 setTeacher(e.target.value);
@@ -442,26 +452,28 @@ export function NoteUpload({ onCreated, onSettled }: { onCreated: (c: Created) =
             />
           </label>
         </div>
-        <div className="stack" style={{ gap: 6 }}>
-          <span className="form-label">Q-Phase</span>
-          <div className="diff-pick quarter-pick" role="group" aria-label="Q-Phase">
-            {QUARTERS.map((q) => (
-              <button
-                key={q}
-                type="button"
-                className="diff-pill quarter-pill"
-                aria-pressed={quarter === q}
-                disabled={busy}
-                onClick={() => {
-                  setQuarter(q);
-                  setTouched({ ...touched, quarter: true });
-                }}
-              >
-                {q}
-              </button>
-            ))}
+        {!isUni && (
+          <div className="stack" style={{ gap: 6 }}>
+            <span className="form-label">Q-Phase</span>
+            <div className="diff-pick quarter-pick" role="group" aria-label="Q-Phase">
+              {QUARTERS.map((q) => (
+                <button
+                  key={q}
+                  type="button"
+                  className="diff-pill quarter-pill"
+                  aria-pressed={quarter === q}
+                  disabled={busy}
+                  onClick={() => {
+                    setQuarter(q);
+                    setTouched({ ...touched, quarter: true });
+                  }}
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </section>
 
       <section className="stack upload-section">
@@ -550,7 +562,7 @@ export function NoteUpload({ onCreated, onSettled }: { onCreated: (c: Created) =
       </button>
       {!canBuild && !busy && (
         <p className="hint" style={{ textAlign: 'center' }}>
-          {subjectId === '' ? 'Wähle ein Fach.' : quarter === '' ? 'Wähle die Q-Phase, sie gehört in den Dateinamen.' : files.length === 0 ? 'Füge mindestens eine Datei hinzu.' : ''}
+          {subjectId === '' ? (isUni ? 'Wähle ein Modul.' : 'Wähle ein Fach.') : !isUni && quarter === '' ? 'Wähle die Q-Phase, sie gehört in den Dateinamen.' : files.length === 0 ? 'Füge mindestens eine Datei hinzu.' : ''}
         </p>
       )}
     </div>

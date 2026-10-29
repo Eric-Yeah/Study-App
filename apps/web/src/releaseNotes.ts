@@ -12,6 +12,17 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '2026.10.29.1',
+    date: '29. Oktober 2026',
+    items: [
+      { icon: '🎓', title: 'Studium als eigener Modus', text: 'Unter Einstellungen → Schule oder Studium schaltest du auf Studium. Dann heißen Fächer Module und Klausuren Prüfungen, Lanis, Abiturrechner und die Hessen-Korrektur sind ausgeblendet. Deine Schuldaten bleiben erhalten, du kannst jederzeit zurückwechseln. Timer, Fokus, Notizen, Karteikarten, Aufgaben, Konzentrationsscore und Erinnerungen laufen unverändert weiter. Neue Konten wählen das schon beim Einrichten.' },
+      { icon: '📚', title: 'Module mit ECTS, Prüfungen mit Art und Versuch', text: 'Ein Modul hat ECTS, Fachsemester, Pflicht oder Wahl und Dozent/in. Aus den ECTS schlägt die App die Lernzeit für die Prüfung vor (rund 27,5 Stunden je ECTS, der Anteil für die Vorbereitung hängt von der Art ab: Klausur, mündlich, Hausarbeit, Referat, Projekt, Testat). Eine Prüfung hat Versuch, Freiversuch, Anmelde- und Abmeldefrist, und alles bleibt überschreibbar. Bei Hausarbeiten legt ein Knopf die Arbeitsschritte rückwärts ab der Abgabe als Aufgaben an.' },
+      { icon: '🧮', title: 'Noten, Schnitt und Fortschritt', text: 'Unter Studium → Noten trägst du Ergebnisse von 1,0 bis 5,0 ein (oder nur bestanden). Die App rechnet den Schnitt nach ECTS, beachtet weitere Versuche, zeigt deinen Fortschritt gegen das Soll (30 ECTS je Semester) und beantwortet „Was brauche ich?“ für einen Zielschnitt. Rundung und Versuche sind Startwerte: Was in deiner Prüfungsordnung steht, gilt.' },
+      { icon: '🗓️', title: 'Stundenplan und Fristen', text: 'Der Stundenplan hat freie Uhrzeiten, wöchentliche, zweiwöchentliche und einzelne Termine, gesperrte Zeiten für Job und Pendeln und zeigt Lücken zum Lernen. Du kannst ihn von Hand eintragen oder aus einer Kalenderdatei (.ics) übernehmen, auch per Kalender-Link (der Link bleibt verschlüsselt auf dem Gerät). Heute zeigt „Heute an der Uni“, „Als Nächstes“ nutzt die Lücken. Unter Plan → Fristen stehen Rückmeldung, Prüfungsanmeldung, BAföG und Abgaben, auf Wunsch mit Erinnerung aufs Handy. In der Prüfungsphase plant die App mit mehr Lernzeit pro Tag.' },
+      { icon: '📄', title: 'Skripte und Folien', text: 'Im Studium kannst du bis zu 400 Seiten zu einem PDF zusammenfügen, die Q-Phase entfällt und die Dozentin oder der Dozent kommt aus dem Modul. Zu lange Skripte bleiben als Notiz mit PDF gespeichert, nur ohne KI-Zusammenfassung. Die KI fasst Unterlagen aus Lehrveranstaltungen für Studierende zusammen.' },
+    ],
+  },
+  {
     version: '2026.10.28.2',
     date: '28. Oktober 2026',
     items: [

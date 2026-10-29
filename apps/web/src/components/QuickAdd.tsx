@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { uid } from '../lib/format';
 import { likelySubjectId } from '../state/daily';
+import { useMode } from '../lib/mode';
 import { useStore } from '../state/store';
 import { HomeworkComposer } from './HomeworkComposer';
 import { Segmented } from './Segmented';
@@ -31,6 +32,7 @@ function SubjectChips({ subjects, value, onChange }: { subjects: Subject[]; valu
  */
 export function QuickAdd({ notOnPhone = false }: { notOnPhone?: boolean }) {
   const { state, dispatch } = useStore();
+  const { isUni } = useMode();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<Tab>('task');
@@ -129,7 +131,7 @@ export function QuickAdd({ notOnPhone = false }: { notOnPhone?: boolean }) {
                 setSaved(null);
               }}
               options={[
-                { value: 'homework', label: 'Hausaufgabe' },
+                { value: 'homework', label: isUni ? 'Abgabe' : 'Hausaufgabe' },
                 { value: 'task', label: 'Aufgabe' },
                 { value: 'card', label: 'Karte' },
                 { value: 'learned', label: 'Gelernt' },

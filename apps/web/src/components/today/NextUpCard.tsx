@@ -9,8 +9,9 @@ import { PHASE_LABELS } from '../../timer/types';
 
 const inDays = (n: number) => (n <= 0 ? 'heute' : n === 1 ? 'morgen' : `in ${n} Tagen`);
 
-function slotLabel(slot: FreeSlot): string {
-  return slot.running ? `Freistunde bis ${slot.end}` : `Freistunde ab ${slot.start}`;
+function slotLabel(slot: FreeSlot, uni = false): string {
+  const word = uni ? 'Lücke' : 'Freistunde';
+  return slot.running ? `${word} bis ${slot.end}` : `${word} ab ${slot.start}`;
 }
 
 /**
@@ -22,6 +23,7 @@ export function NextUpCard({ list, next, slot }: { list: ExamWithPlan[]; next: N
   const timer = useTimer();
   const navigate = useNavigate();
   const t = timer.state;
+  const uni = state.profile?.role === 'student_university';
   const subject = (id: string | null) => state.subjects.find((s) => s.id === id);
 
   // Der Timer ist schon im Gang: hier zeigen, nicht noch einmal anbieten
@@ -59,10 +61,10 @@ export function NextUpCard({ list, next, slot }: { list: ExamWithPlan[]; next: N
   if (next.kind === 'study') {
     const s = subject(next.subjectId);
     const item = list.find((x) => x.exam.id === next.examId);
-    const forExam = item ? `${item.exam.title || 'Klausur'} ${inDays(item.plan.daysLeft)}` : '';
+    const forExam = item ? `${item.exam.title || (state.profile?.role === 'student_university' ? 'Prüfung' : 'Klausur')} ${inDays(item.plan.daysLeft)}` : '';
     return (
       <div className="card nextup">
-        <span className="nextup-eyebrow">{next.slot ? slotLabel(next.slot) : 'Als Nächstes'}</span>
+        <span className="nextup-eyebrow">{next.slot ? slotLabel(next.slot, uni) : 'Als Nächstes'}</span>
         <div className="nextup-title">
           {s && <span className="dot" style={{ background: s.color }} />}
           {s?.name ?? 'Lernen'}
@@ -86,7 +88,7 @@ export function NextUpCard({ list, next, slot }: { list: ExamWithPlan[]; next: N
     const s = subject(next.subjectId);
     return (
       <div className="card nextup">
-        <span className="nextup-eyebrow">{next.slot ? slotLabel(next.slot) : 'Offene Aufgabe'}</span>
+        <span className="nextup-eyebrow">{next.slot ? slotLabel(next.slot, uni) : 'Offene Aufgabe'}</span>
         <div className="nextup-title">{next.title}</div>
         {s && (
           <p className="muted">
@@ -110,7 +112,7 @@ export function NextUpCard({ list, next, slot }: { list: ExamWithPlan[]; next: N
     const n = Math.min(next.count, CONFIG.daily.miniRoundCards);
     return (
       <div className="card nextup">
-        <span className="nextup-eyebrow">{slot ? slotLabel(slot) : 'Als Nächstes'}</span>
+        <span className="nextup-eyebrow">{slot ? slotLabel(slot, uni) : 'Als Nächstes'}</span>
         <div className="nextup-title">{next.count === 1 ? '1 Karte ist fällig' : `${next.count} Karten sind fällig`}</div>
         <p className="muted">Der Tagesplan ist durch. Ein kurzer Durchgang hält das Gelernte frisch, ca. {estimateCardMinutes(n)} min.</p>
         <div className="nextup-actions">
@@ -131,7 +133,7 @@ export function NextUpCard({ list, next, slot }: { list: ExamWithPlan[]; next: N
     const s = subject(next.subjectId);
     return (
       <div className="card nextup">
-        <span className="nextup-eyebrow">{next.slot ? slotLabel(next.slot) : 'Heute ist nichts geplant'}</span>
+        <span className="nextup-eyebrow">{next.slot ? slotLabel(next.slot, uni) : 'Heute ist nichts geplant'}</span>
         <div className="nextup-title">
           {s && <span className="dot" style={{ background: s.color }} />}
           {s?.name ?? 'Lernen'}

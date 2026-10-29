@@ -20,7 +20,23 @@ export interface Subject {
   points: number | null; // 0-15, null: noch keine Note oder bewusst nicht einbezogen
   difficulty: number; // 1-5
   language: Language; // Unterrichtssprache, bestimmt die Sprache der KI-Zusammenfassungen und -Karten
+  /** Schule oder Studium. Fehlt das Feld, gilt 'school'. Die App zeigt immer nur die Fächer des eingestellten Modus. */
+  scope?: Scope;
+  /** Nur Studium (Modul): Leistungspunkte (ECTS), null: nicht angegeben */
+  ects?: number | null;
+  /** Nur Studium: Fachsemester, in dem das Modul belegt wird, null: nicht angegeben */
+  semester?: number | null;
+  /** Nur Studium: Pflichtmodul (true) oder Wahlmodul (false) */
+  required?: boolean;
+  /** Nur Studium: Dozentin oder Dozent */
+  lecturer?: string;
 }
+
+/** Schule (Lanis, Abitur) oder Studium. Die Daten beider Seiten bleiben erhalten, die Oberfläche zeigt eine. */
+export type Scope = 'school' | 'uni';
+
+/** Art einer Prüfungsleistung im Studium. */
+export type ExamKind = 'written' | 'oral' | 'paper' | 'presentation' | 'project' | 'testat' | 'other';
 
 export interface Exam {
   id: string;
@@ -38,6 +54,18 @@ export interface Exam {
   lanisNotice?: string | null;
   /** Lanis-Datum, über das der Nutzer schon informiert wurde (damit der Hinweis nur einmal kommt). */
   lanisAck?: string | null;
+  /** Nur Studium: Art der Prüfung. Fehlt das Feld, gilt 'written'. */
+  kind?: ExamKind;
+  /** Nur Studium: der wievielte Versuch (1 bis 3), Standard 1 */
+  attempt?: number;
+  /** Nur Studium: Freiversuch (fällt der Versuch durch, zählt er nicht) */
+  freeAttempt?: boolean;
+  /** Nur Studium: letzter Tag für die Anmeldung zur Prüfung (YYYY-MM-DD) */
+  registerBy?: string | null;
+  /** Nur Studium: letzter Tag für die Abmeldung (YYYY-MM-DD) */
+  withdrawBy?: string | null;
+  /** Nur Studium: zählt die Prüfung für die Note? false bei Studienleistungen und Testaten. Standard true */
+  graded?: boolean;
 }
 
 export interface PlanSettings {

@@ -10,6 +10,9 @@ import { NextUpCard } from '../components/today/NextUpCard';
 import { PushNudge } from '../components/today/PushNudge';
 import { LanisDateNotice } from '../components/LanisDateNotice';
 import { StreakRow } from '../components/today/StreakRow';
+import { DeadlinesCard } from '../components/today/DeadlinesCard';
+import { StudyDay } from '../components/today/StudyDay';
+import { useMode } from '../lib/mode';
 import { formatDateLong, formatDateShort, formatDays, formatMinutes, uid } from '../lib/format';
 import { minutesBySubject, nextUpFor, openTasksFor } from '../state/daily';
 import { blocksForDate, combinedPlan, examsWithPlans, learnedMinutesOn, upcoming } from '../state/selectors';
@@ -19,6 +22,7 @@ import { useTimer } from '../timer/TimerProvider';
 export function Today() {
   const { state, dispatch } = useStore();
   const timer = useTimer();
+  const { isUni, terms } = useMode();
   const navigate = useNavigate();
   const [title, setTitle] = useState('');
   const today = new Date();
@@ -114,7 +118,7 @@ export function Today() {
               ? nextStart
                 ? `Heute steht kein Lernblock an. ${nextStart.item.subject.name} startet am ${formatDateLong(nextStart.date)}.`
                 : list.length === 0
-                  ? 'Heute ist nichts geplant. Lege eine Klausur an, dann verteilt die App die Lernzeit.'
+                  ? `Heute ist nichts geplant. Lege ${isUni ? 'eine Prüfung' : 'eine Klausur'} an, dann verteilt die App die Lernzeit.`
                   : 'Heute steht kein Lernblock an.'
               : learned >= goal
                 ? 'Tagesziel erreicht.'
@@ -137,7 +141,7 @@ export function Today() {
           {nextExam ? (
             <Link to={`/klausur/${nextExam.exam.id}`} className="card stack" style={{ textDecoration: 'none', color: 'inherit', background: 'var(--warn-soft)', borderColor: 'transparent' }}>
               <p className="muted" style={{ color: 'var(--warn)' }}>
-                Nächste Klausur
+                {terms.nextExam}
               </p>
               <div className="between">
                 <div>
@@ -153,10 +157,10 @@ export function Today() {
             </Link>
           ) : (
             <div className="card stack">
-              <h2>Keine Klausur geplant</h2>
-              <p className="muted">Trag deine nächste Klausur ein, dann schlägt die App Vorlauf und Lernzeit vor.</p>
+              <h2>{terms.noExam}</h2>
+              <p className="muted">Trag deine nächste {terms.exam} ein, dann schlägt die App Vorlauf und Lernzeit vor.</p>
               <Link className="btn" to="/klausur/neu">
-                <Plus size={18} aria-hidden="true" /> Klausur anlegen
+                <Plus size={18} aria-hidden="true" /> {terms.newExam}
               </Link>
             </div>
           )}
@@ -164,11 +168,20 @@ export function Today() {
         </div>
       </div>
 
-      <LanisDateNotice />
+      {isUni ? (
+        <>
+          <StudyDay />
+          <DeadlinesCard />
+        </>
+      ) : (
+        <>
+          <LanisDateNotice />
 
-      <SchoolDay />
+          <SchoolDay />
 
-      <AbsencesCard />
+          <AbsencesCard />
+        </>
+      )}
 
       <PushNudge />
 
@@ -184,7 +197,7 @@ export function Today() {
                 <span className="row" style={{ gap: 10, minWidth: 0 }}>
                   <span className="dot" style={{ background: item.subject.color }} />
                   <span className={`plan-row-name${done ? ' done-text' : ''}`}>
-                    {item.subject.name}: {item.exam.title || 'Klausur'}
+                    {item.subject.name}: {item.exam.title || terms.exam}
                   </span>
                 </span>
                 <span className="row" style={{ gap: 10, flex: 'none' }}>

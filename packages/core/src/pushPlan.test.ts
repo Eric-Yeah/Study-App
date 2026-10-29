@@ -119,3 +119,31 @@ describe('Klausur naht und Rückstand', () => {
     expect(buildPushItems({ ...base, exams: [exam()], prefs: prefs({ plan: false, exam: false }) })).toEqual([]);
   });
 });
+
+import { UNI_WORDS } from './pushPlan';
+
+describe('Studium: Fristen und Wortwahl', () => {
+  const deadline = { id: 'd1', title: 'Rückmeldung', date: '2026-10-17', remindDays: 7 };
+
+  it('erinnert eine Woche vorher und am Tag davor', () => {
+    const items = buildPushItems({ ...base, exams: [], prefs: prefs({ plan: false }), deadlines: [deadline] });
+    expect(items.map((i) => i.title)).toEqual(['Frist in 7 Tagen: Rückmeldung', 'Frist morgen: Rückmeldung']);
+    expect(items.every((i) => i.url === '/fristen' && i.kind === 'exam')).toBe(true);
+    expect(items.every((i) => hhmm(i.dueAt) === '18:00')).toBe(true);
+  });
+
+  it('ohne den Schalter für Hinweise keine Fristen, vergangene Fristen nie', () => {
+    expect(buildPushItems({ ...base, exams: [], prefs: prefs({ plan: false, exam: false }), deadlines: [deadline] })).toEqual([]);
+    expect(buildPushItems({ ...base, exams: [], prefs: prefs({ plan: false }), deadlines: [{ ...deadline, date: '2026-10-05' }] })).toEqual([]);
+  });
+
+  it('weiter als zwei Wochen voraus noch keine Mitteilung', () => {
+    expect(buildPushItems({ ...base, exams: [], prefs: prefs({ plan: false }), deadlines: [{ ...deadline, date: '2026-12-01' }] })).toEqual([]);
+  });
+
+  it('sagt Prüfung statt Klausur', () => {
+    const items = buildPushItems({ ...base, exams: [exam()], prefs: prefs(), words: UNI_WORDS });
+    expect(items.some((i) => i.title.includes('Prüfung'))).toBe(true);
+    expect(items.some((i) => /Klausur/.test(`${i.title} ${i.body}`))).toBe(false);
+  });
+});

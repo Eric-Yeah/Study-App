@@ -2,10 +2,13 @@ import {
   CONFIG,
   buildQueue,
   currentFreeSlot,
+  eventFreeSlot,
+  eventSubjectId,
   guessSubjectId,
   isFreeWeekday,
   nextUp,
   priorityBreakdown,
+  subjectPriorityAuto,
   studyStreak,
   timeOf,
   toIsoDate,
@@ -15,6 +18,7 @@ import {
   type StreakResult,
 } from '@study/core';
 import { blocksForDate, combinedPlan, examsWithPlans, type ExamWithPlan } from './selectors';
+import { modeOf } from './scope';
 import type { AppState } from './store';
 
 export function minutesBySubject(state: Pick<AppState, 'sessions'>, iso: string): Record<string, number> {
@@ -42,7 +46,9 @@ export function nextUpFor(
   const iso = toIsoDate(now);
   const list = given?.list ?? examsWithPlans(state, now);
   const blocks = given?.blocks ?? blocksForDate(combinedPlan(state, list, now), list, iso);
-  const slot = currentFreeSlot(state.timetable, iso, timeOf(now));
+  const uni = modeOf(state) === 'university';
+  // Schule: Freistunde aus dem Lanis-Raster, Studium: Lücke zwischen Terminen im Stundenplan
+  const slot = uni ? eventFreeSlot(state.events, now) : currentFreeSlot(state.timetable, iso, timeOf(now));
   const subjects = state.subjects.filter((s) => priorityBreakdown(s).status !== 'dropped');
   const next = nextUp({
     blocks: blocks.map((b) => ({ examId: b.item.exam.id, subjectId: b.item.subject.id, examDate: b.item.exam.date, plannedMin: b.minutes })),
@@ -51,7 +57,7 @@ export function nextUpFor(
     openTasks: openTasksFor(state, iso).map((t) => ({ id: t.id, title: t.title, subjectId: t.subjectId })),
     slot,
     focusMin: state.timer.focusMin,
-    fallbackSubjectIds: [...subjects].sort((a, b) => priorityBreakdown(b).auto - priorityBreakdown(a).auto).map((s) => s.id),
+    fallbackSubjectIds: [...subjects].sort((a, b) => subjectPriorityAuto(b) - subjectPriorityAuto(a)).map((s) => s.id),
   });
   return { next, slot };
 }
@@ -74,7 +80,7 @@ export function streakFor(state: AppState, now: Date): StreakResult {
 /** Fach, das gerade am wahrscheinlichsten gemeint ist: laufende Stunde, sonst zuletzt gelernt, sonst null. */
 export function likelySubjectId(state: AppState, now: Date): string | null {
   const iso = toIsoDate(now);
-  const fromLesson = guessSubjectId(state.timetable, state.subjects, iso, timeOf(now));
+  const fromLesson = modeOf(state) === 'university' ? eventSubjectId(state.events, now) : guessSubjectId(state.timetable, state.subjects, iso, timeOf(now));
   if (fromLesson) return fromLesson;
   const last = [...state.sessions].reverse().find((s) => s.subjectId && state.subjects.some((x) => x.id === s.subjectId));
   return last?.subjectId ?? null;

@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { TimetableGrid } from '../components/TimetableGrid';
 import { formatAgendaDay, formatMinutes } from '../lib/format';
 import { blocksForDate, combinedPlan, examsWithPlans, learnedMinutesOn, type ExamWithPlan } from '../state/selectors';
+import { useMode } from '../lib/mode';
 import { useStore } from '../state/store';
 
 const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
@@ -150,6 +151,7 @@ function DayCard({
 
 export function Plan() {
   const { state, dispatch } = useStore();
+  const { isUni, terms } = useMode();
   const today = new Date();
   const todayIso = toIsoDate(today);
   const list = examsWithPlans(state, today);
@@ -189,15 +191,17 @@ export function Plan() {
         </div>
         <div className="row">
           <Link className="btn btn-primary" to="/klausur/neu">
-            <Plus size={18} aria-hidden="true" /> Klausur anlegen
+            <Plus size={18} aria-hidden="true" /> {terms.newExam}
           </Link>
         </div>
       </div>
 
       {shortfalls.map(({ item, minutes }) => (
         <p key={item!.exam.id} className="notice" role="status">
-          Für {item!.exam.title || item!.subject.name} fehlen im Plan noch {formatMinutes(minutes)}. Gib mehr Tage frei (zum Beispiel
-          „Bis 2 h“), senke die Gesamtzeit oder starte früher.
+          Für {item!.exam.title || item!.subject.name} fehlen im Plan noch {formatMinutes(minutes)}.{' '}
+          {isUni
+            ? 'Erhöhe das Tageslimit in den Einstellungen, senke die Gesamtzeit der Prüfung oder starte früher.'
+            : 'Gib mehr Tage frei (zum Beispiel „Bis 2 h“), senke die Gesamtzeit oder starte früher.'}
         </p>
       ))}
 
@@ -240,7 +244,7 @@ export function Plan() {
         </div>
         {agenda.length === 0 ? (
           <div className="card empty">
-            <p className="muted">Sobald eine Klausur ansteht, verteilt die App die Lernzeit auf die Tage.</p>
+            <p className="muted">Sobald {isUni ? 'eine Prüfung' : 'eine Klausur'} ansteht, verteilt die App die Lernzeit auf die Tage.</p>
           </div>
         ) : (
           <div className="days">
@@ -258,13 +262,25 @@ export function Plan() {
         )}
       </section>
 
-      <TimetableGrid />
+      {isUni ? (
+        <Link to="/stundenplan" className="card between" style={{ textDecoration: 'none', color: 'inherit' }}>
+          <span>
+            <strong>Stundenplan</strong>
+            <span className="hint" style={{ display: 'block' }}>
+              {state.events.length === 0 ? 'Noch leer: Vorlesungen eintragen oder aus einer Kalenderdatei übernehmen' : `${state.events.length} Termine · Woche, Lücken und gesperrte Zeiten`}
+            </span>
+          </span>
+          <ChevronRight size={18} aria-hidden="true" />
+        </Link>
+      ) : (
+        <TimetableGrid />
+      )}
 
       <Link to="/klausuren" className="card between" style={{ textDecoration: 'none', color: 'inherit' }}>
         <span>
-          <strong>Klausuren</strong>
+          <strong>{terms.exams}</strong>
           <span className="hint" style={{ display: 'block' }}>
-            {upcoming === 0 ? 'Keine Klausur geplant' : upcoming === 1 ? '1 Klausur steht an' : `${upcoming} Klausuren stehen an`} · Fortschritt, Themen und Korrektur
+            {upcoming === 0 ? terms.noExam : upcoming === 1 ? `1 ${terms.exam} steht an` : `${upcoming} ${terms.exams} stehen an`} · Fortschritt und Themen{isUni ? '' : ' und Korrektur'}
           </span>
         </span>
         <ChevronRight size={18} aria-hidden="true" />

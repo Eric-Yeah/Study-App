@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Timeline } from './Timeline';
 import { formatDateShort, formatHours, formatInDays, formatMinutes } from '../lib/format';
 import { examsWithPlans, learnedForExam, realityFor, topicsOf } from '../state/selectors';
+import { useMode } from '../lib/mode';
 import { useStore } from '../state/store';
 
 const REALITY_TEXT: Record<RealityStatus, (min: number) => string> = {
@@ -16,13 +17,14 @@ const REALITY_TEXT: Record<RealityStatus, (min: number) => string> = {
 /** Alle Klausuren als Karten mit Fortschritt, Realitätscheck, Themen und Zeitleiste (Bereich Klausuren, Reiter Termine). */
 export function ExamCards() {
   const { state } = useStore();
+  const { isUni } = useMode();
   const today = new Date();
   const list = examsWithPlans(state, today);
   return (
     <>
       {list.length === 0 && (
         <div className="card empty">
-          <p className="muted">Noch keine Klausur angelegt. Importiere sie aus Lanis oder lege sie von Hand an.</p>
+          <p className="muted">{isUni ? 'Noch keine Prüfung angelegt. Lege sie von Hand an, dann plant die App die Lernzeit aus den ECTS des Moduls.' : 'Noch keine Klausur angelegt. Importiere sie aus Lanis oder lege sie von Hand an.'}</p>
         </div>
       )}
       <div className="grid cols-2 match">

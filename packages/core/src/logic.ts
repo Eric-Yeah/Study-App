@@ -1,4 +1,5 @@
 import { CONFIG } from './config';
+import { examKindOf, isModule, moduleHoursAuto, moduleLeadDays, modulePriority } from './studyEffort';
 import type { DayKind, Exam, PlanSettings, Subject, SubjectStatus, SubjectType } from './types';
 
 const clamp = (x: number, a: number, b: number) => Math.min(b, Math.max(a, x));
@@ -40,6 +41,11 @@ export function priorityBreakdown(
   const auto =
     status === 'drop_q3' ? Math.max(cfg.min, raw - cfg.dropQ3Penalty) : status === 'dropped' ? cfg.min : raw;
   return { weighting, gradeBonus, gradeKnown, difficultyBonus, raw, status, statusIgnored: isStatusIgnored(s), auto };
+}
+
+/** Automatische Priorität eines Fachs oder Moduls (ohne Prüfung): Module nach ECTS und Schwierigkeit, Schulfächer nach Note und Gewichtung. */
+export function subjectPriorityAuto(s: Subject): number {
+  return isModule(s) ? modulePriority(s, {}).auto : priorityBreakdown(s).auto;
 }
 
 export function totalHoursAuto(priority: number, status: SubjectStatus, cfg = CONFIG.totalTime): number {
@@ -125,6 +131,8 @@ export interface Overridable {
 }
 
 export interface ExamPlan {
+  /** 'module': Plan aus den ECTS eines Moduls (Studium), sonst Schule */
+  source: 'school' | 'module';
   priority: Overridable & { breakdown: PriorityBreakdown };
   totalHours: Overridable;
   startDays: Overridable;
@@ -139,16 +147,34 @@ export interface ExamPlan {
   timeline: DayKind[];
 }
 
+/** Aufschlüsselung der Priorität eines Moduls im Format der Schul-Aufschlüsselung: Gewichtung = ECTS, Note = weiterer Versuch. */
+function moduleBreakdown(subject: Subject, exam: Exam): PriorityBreakdown {
+  const p = modulePriority(subject, exam);
+  return {
+    weighting: p.ectsBonus,
+    gradeBonus: p.retryBonus,
+    gradeKnown: true,
+    difficultyBonus: p.difficultyBonus,
+    raw: p.raw,
+    status: 'active',
+    statusIgnored: false,
+    auto: p.auto,
+  };
+}
+
 export function planExam(subject: Subject, exam: Exam, settings: PlanSettings, today: Date = new Date()): ExamPlan {
-  const breakdown = priorityBreakdown(subject);
+  const mod = isModule(subject);
+  const breakdown = mod ? moduleBreakdown(subject, exam) : priorityBreakdown(subject);
   const priorityValue = exam.priorityManual ?? breakdown.auto;
   const hasPlan = breakdown.status !== 'dropped';
 
-  const totalAuto = totalHoursAuto(priorityValue, breakdown.status);
+  const kind = examKindOf(exam);
+  const totalAuto = mod ? moduleHoursAuto(subject.ects as number, kind, exam.attempt ?? 1) : totalHoursAuto(priorityValue, breakdown.status);
   const totalValue = hasPlan ? exam.totalHoursManual ?? totalAuto : 0;
 
   const daysLeft = daysUntil(exam.date, today);
-  const startAuto = Math.max(1, Math.min(leadDaysAuto(priorityValue, subject.type), Math.max(1, daysLeft)));
+  const leadAuto = mod ? moduleLeadDays(subject.ects as number, kind) : leadDaysAuto(priorityValue, subject.type);
+  const startAuto = Math.max(1, Math.min(leadAuto, Math.max(1, daysLeft)));
   const startValue = resolveStartDays(exam.startDaysManual, startAuto, daysLeft);
 
   const sDays = studyDays(startValue, settings.freeDaysPerWeek);
@@ -158,6 +184,7 @@ export function planExam(subject: Subject, exam: Exam, settings: PlanSettings, t
   const gap = reviewGap(startValue);
 
   return {
+    source: mod ? 'module' : 'school',
     priority: {
       auto: breakdown.auto,
       value: priorityValue,

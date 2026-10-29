@@ -1,8 +1,9 @@
-import { dueOptions, ownKey, parseHomeworkEntry, toIsoDate } from '@study/core';
+import { dueOptions, nextEventDay, ownKey, parseHomeworkEntry, toIsoDate } from '@study/core';
 import { Check, Plus } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
 import { formatAgendaDay, uid } from '../lib/format';
 import { likelySubjectId } from '../state/daily';
+import { useMode } from '../lib/mode';
 import { useStore } from '../state/store';
 
 type DueMode = 'auto' | 'tomorrow' | 'date';
@@ -15,6 +16,7 @@ type DueChip = 'next' | 'tomorrow' | 'date';
  */
 export function HomeworkComposer({ autoFocus = false }: { autoFocus?: boolean }) {
   const { state, dispatch } = useStore();
+  const { isUni } = useMode();
   const today = toIsoDate(new Date());
   const [text, setText] = useState('');
   const [picked, setPicked] = useState<string | null | undefined>(undefined); // undefined = automatisch
@@ -28,7 +30,10 @@ export function HomeworkComposer({ autoFocus = false }: { autoFocus?: boolean })
   const subjects = state.subjects.filter((s) => s.status !== 'dropped' || s.isAdvanced || s.isExamSubject);
   const parsed = parseHomeworkEntry(text, state.subjects, today);
   const subjectId = picked !== undefined ? picked : parsed.subjectId ?? fallbackSubject;
-  const options = dueOptions(subjectId, today, state.timetable, state.subjects);
+  const schoolOptions = dueOptions(subjectId, today, state.timetable, state.subjects);
+  // Studium: nächste Veranstaltung des Moduls aus dem Stundenplan, sonst morgen
+  const nextEvent = isUni ? nextEventDay(state.events, subjectId, today) : null;
+  const options = isUni ? { ...schoolOptions, next: nextEvent ?? schoolOptions.tomorrow, fromTimetable: nextEvent !== null } : schoolOptions;
   const due = mode === 'date' && custom ? custom : mode === 'tomorrow' ? options.tomorrow : parsed.due ?? options.next;
 
   const active: DueChip = mode === 'date' ? 'date' : due === options.next ? 'next' : due === options.tomorrow ? 'tomorrow' : 'date';
@@ -63,7 +68,7 @@ export function HomeworkComposer({ autoFocus = false }: { autoFocus?: boolean })
           className="input"
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Mathe S. 45 Nr. 3 bis Freitag"
+          placeholder={isUni ? 'Analysis Blatt 5 bis Freitag' : 'Mathe S. 45 Nr. 3 bis Freitag'}
           aria-label="Neue Hausaufgabe"
           maxLength={300}
           enterKeyHint="done"
@@ -85,7 +90,7 @@ export function HomeworkComposer({ autoFocus = false }: { autoFocus?: boolean })
 
       <div className="row quick-subjects" role="group" aria-label="Abgabe">
         <button type="button" className="chip" aria-pressed={active === 'next'} onClick={() => setMode('auto')}>
-          {options.fromTimetable ? 'Nächste Stunde' : 'Nächster Schultag'} · {formatAgendaDay(options.next, today)}
+          {options.fromTimetable ? (isUni ? 'Nächste Veranstaltung' : 'Nächste Stunde') : isUni ? 'Morgen' : 'Nächster Schultag'} · {formatAgendaDay(options.next, today)}
         </button>
         {options.tomorrow !== options.next && (
           <button type="button" className="chip" aria-pressed={active === 'tomorrow'} onClick={() => setMode('tomorrow')}>

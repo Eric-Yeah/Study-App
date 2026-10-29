@@ -1,5 +1,7 @@
 import {
   addDays,
+  capacityOverrides,
+  daysUntil,
   expectedMinutesBeforeToday,
   latestLoadRatio,
   manualTrainingLoad,
@@ -15,6 +17,7 @@ import {
   type Subject,
   type WeekData,
 } from '@study/core';
+import { modeOf } from './scope';
 import type { AppState, Checkin, FitnessDay, FocusSession } from './store';
 
 export interface ExamWithPlan {
@@ -61,11 +64,18 @@ export function combinedPlan(state: AppState, list: ExamWithPlan[], today = new 
         reviewDates,
       };
     });
+  const own = Object.fromEntries(state.dayOverrides.map((o) => [o.date, o.capacityMin]));
+  const lastExam = list.reduce((m, x) => (x.exam.date > m ? x.exam.date : m), iso);
+  // Studium: Prüfungsphase und vorlesungsfreie Zeit haben mehr Kapazität, gesperrte Zeit (Job, Pendeln) weniger. Eigene Ausfälle gehen vor.
+  const overrides =
+    modeOf(state) === 'university'
+      ? capacityOverrides(iso, daysUntil(lastExam, today), state.study, state.events, state.plan.dailyLimitMin, state.plan.freeDaysPerWeek, own)
+      : own;
   return planAll(inputs, {
     today: iso,
     dailyLimitMin: state.plan.dailyLimitMin,
     freeDaysPerWeek: state.plan.freeDaysPerWeek,
-    overrides: Object.fromEntries(state.dayOverrides.map((o) => [o.date, o.capacityMin])),
+    overrides,
   });
 }
 

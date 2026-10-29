@@ -399,6 +399,54 @@ export const CONFIG = {
     streakLookbackDays: 400,
     overdueTaskDays: 14, // offene Aufgaben der letzten Tage erscheinen noch auf Heute
   },
+  study: {
+    // Studium: Startwerte aus der Recherche (docs/studenten-feature-recherche.md). Prüfungsordnungen weichen ab, darum sind
+    // Rundung, Versuche und Noten-Schritte hier einstellbar und kein Gesetz. Manuelle Werte gehen vor.
+    hoursPerEcts: 27.5, // 1 ECTS sind 25 bis 30 Stunden Arbeit
+    weeksPerSemester: 15,
+    swsMinutes: 45, // 1 SWS = 45 Minuten pro Woche
+    ectsPerSemester: 30,
+    defaultTotalEcts: { bachelor: 180, master: 120, staatsexamen: 300, other: 180 } as Record<string, number>,
+    defaultRegularSemesters: { bachelor: 6, master: 4, staatsexamen: 10, other: 6 } as Record<string, number>,
+    maxAttempts: 3, // Standard der meisten Prüfungsordnungen, bitte mit der eigenen vergleichen
+    // Plan: Studierende haben viel mehr Arbeitszeit als Schüler. Die Grenzen sind Hinweise und blockieren nichts.
+    plan: {
+      defaultFreeDaysPerWeek: 1 as 0 | 1 | 2,
+      defaultDailyLimitMin: 300,
+      examPhaseLimitMin: 360, // Prüfungsphase und vorlesungsfreie Zeit: höheres Tageslimit
+      blockedFactor: 1, // gesperrte Zeit (Job, Pendeln) mindert die Tageskapazität in voller Länge
+      minCapacityMin: 30, // an einem Tag mit viel gesperrter Zeit bleibt mindestens das übrig (außer bei Ausfall)
+    },
+    // Anteil des Modulaufwands (ECTS mal Stunden), der auf die Prüfungsvorbereitung fällt. Der Rest ist Vorlesung,
+    // Übung und Nacharbeit im Semester. Der Anteil ist nicht belegt, sondern ein Startwert zum Überschreiben.
+    examShare: { written: 0.35, oral: 0.3, paper: 0.85, presentation: 0.5, project: 0.7, testat: 0.2, other: 0.3 } as Record<string, number>,
+    minHours: 4,
+    capHours: 160, // Obergrenze der Prüfungsvorbereitung für eine Prüfung (im Schulmodus gilt totalTime.capHours)
+    retryFactor: 1.2, // ab dem zweiten Versuch mehr Zeit
+    roundToHours: 0.5,
+    lead: { daysBase: 10, daysPerEcts: 2.5, minDays: 7, maxDays: 56, paperDaysPerEcts: 5, paperMaxDays: 120 },
+    priority: { base: 3, ectsMaxBonus: 3, ectsForMax: 12, difficultyMaxBonus: 2, retryBonus: 1, lastAttemptBonus: 2 },
+    // Noten 1,0 bis 5,0 (deutsche Skala). Zulässige Schritte, bestanden ab dieser Note, Rundung des Durchschnitts.
+    gradeSteps: [1.0, 1.3, 1.7, 2.0, 2.3, 2.7, 3.0, 3.3, 3.7, 4.0, 5.0] as readonly number[],
+    passGrade: 4.0,
+    averageDecimals: 1,
+    averageRounding: 'truncate' as 'truncate' | 'round', // viele Ordnungen streichen weitere Stellen ohne zu runden
+    labelLimits: [1.5, 2.5, 3.5, 4.0] as readonly number[], // sehr gut, gut, befriedigend, ausreichend, sonst nicht ausreichend
+    maxEventsPerUser: 600,
+    defaultRemindDays: 7,
+    // Hausarbeit: Arbeitsschritte, Anteile der Zeit bis zur Abgabe (Summe 1)
+    writingSteps: [
+      { title: 'Thema eingrenzen und Literatur suchen', share: 0.15 },
+      { title: 'Gliederung und Fragestellung', share: 0.1 },
+      { title: 'Schreiben', share: 0.45 },
+      { title: 'Überarbeiten', share: 0.15 },
+      { title: 'Formatieren, Literaturverzeichnis, Korrekturlesen', share: 0.15 },
+    ] as readonly { title: string; share: number }[],
+    pdf: { maxPages: 400, maxPagesPerUpload: 120 }, // Skripte und Folien sind länger als ein Arbeitsblatt
+    // Stundenplan: Lücken zwischen Veranstaltungen als Lerngelegenheit
+    day: { startMin: 8 * 60, endMin: 20 * 60, minGapMin: 30 },
+    ics: { maxEvents: 400, maxExpand: 120, maxBytes: 2_000_000, unboundedWeeks: 26 }, // ohne Ende in der Datei gilt ein Termin so viele Wochen
+  },
 } as const;
 
 export type Config = typeof CONFIG;

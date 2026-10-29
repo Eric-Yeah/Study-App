@@ -1,4 +1,4 @@
-import { AI_FEATURES, readHomework, type AbsenceReport, clampPoints, clampWeight, defaultWeight, isGradeKind, readGradeSettings, type GradeEntry, CONFIG, readAccess, type AccountAccess, readAbiturPlan, emptyPlan, sanitizeStyle, type StyleRecord, isLanguage, isQuarter, isLevel, readLessons, readPracticeContent, readPracticeMeta, readStoredGrading, readTeacherTasks, type ExamReview, type PracticeRecord, type SubjectRubric, toDifficulty, type Flashcard, type Effort, type Exam, Legibility, PlanSettings, Role, Stage, Subject, SubjectStatus, SubjectType, SubstitutionEntry, Timetable, WorksheetSummary } from '@study/core';
+import { AI_FEATURES, isDeadlineKind, isEventKind, isExamKind, readStudyProfile, type Deadline, type ModuleResult, type Scope, type StudyEvent, readHomework, type AbsenceReport, clampPoints, clampWeight, defaultWeight, isGradeKind, readGradeSettings, type GradeEntry, CONFIG, readAccess, type AccountAccess, readAbiturPlan, emptyPlan, sanitizeStyle, type StyleRecord, isLanguage, isQuarter, isLevel, readLessons, readPracticeContent, readPracticeMeta, readStoredGrading, readTeacherTasks, type ExamReview, type PracticeRecord, type SubjectRubric, toDifficulty, type Flashcard, type Effort, type Exam, Legibility, PlanSettings, Role, Stage, Subject, SubjectStatus, SubjectType, SubstitutionEntry, Timetable, WorksheetSummary } from '@study/core';
 import { supabase } from '../lib/supabase';
 import type { Action, AppState, Checkin, DayOverride, FitnessDay, FocusSession, LessonNote, Task, Topic } from './store';
 
@@ -9,7 +9,7 @@ import type { Action, AppState, Checkin, DayOverride, FitnessDay, FocusSession, 
 
 export type RemoteData = Pick<
   AppState,
-  'onboarded' | 'profile' | 'subjects' | 'exams' | 'plan' | 'timer' | 'sessions' | 'tasks' | 'checkins' | 'fitness' | 'dayOverrides' | 'topics' | 'timetable' | 'timetableAt' | 'substitutions' | 'substitutionsAt' | 'absences' | 'absencesAt' | 'homework' | 'homeworkAt' | 'notes' | 'cards' | 'examReviews' | 'rubrics' | 'practiceExams' | 'abiturPlan' | 'grades' | 'gradeSettings' | 'taskStyles' | 'account'
+  'onboarded' | 'profile' | 'subjects' | 'exams' | 'plan' | 'timer' | 'sessions' | 'tasks' | 'checkins' | 'fitness' | 'dayOverrides' | 'topics' | 'timetable' | 'timetableAt' | 'substitutions' | 'substitutionsAt' | 'absences' | 'absencesAt' | 'homework' | 'homeworkAt' | 'notes' | 'cards' | 'examReviews' | 'rubrics' | 'practiceExams' | 'abiturPlan' | 'grades' | 'gradeSettings' | 'taskStyles' | 'account' | 'study' | 'results' | 'deadlines' | 'events'
 >;
 
 function ok<T extends { error: { message: string } | null }>(res: T): T {
@@ -29,6 +29,10 @@ const subjectRow = (userId: string, s: Subject) => ({
   points: s.points,
   difficulty: s.difficulty,
   language: s.language,
+  // Die Studienspalten gibt es erst mit der Migration 20261103: Schulfächer schreiben sie nicht, damit alles auch davor läuft
+  ...(s.scope === 'uni'
+    ? { scope: 'uni', ects: s.ects ?? null, semester: s.semester ?? null, required: s.required ?? true, lecturer: s.lecturer ?? '' }
+    : {}),
 });
 
 const examRow = (userId: string, e: Exam) => ({
@@ -44,6 +48,60 @@ const examRow = (userId: string, e: Exam) => ({
   lanis_date: e.lanisDate ?? null,
   lanis_notice: e.lanisNotice ?? null,
   lanis_ack: e.lanisAck ?? null,
+  // Studium (Migration 20261103): nur bei Prüfungen, die diese Felder haben
+  ...(e.kind !== undefined
+    ? {
+        kind: e.kind,
+        attempt: e.attempt ?? 1,
+        free_attempt: e.freeAttempt ?? false,
+        register_by: e.registerBy ?? null,
+        withdraw_by: e.withdrawBy ?? null,
+        graded: e.graded ?? true,
+      }
+    : {}),
+});
+
+const resultRow = (userId: string, r: ModuleResult) => ({
+  id: r.id,
+  user_id: userId,
+  subject_id: r.subjectId,
+  exam_id: r.examId,
+  grade: r.grade,
+  passed: r.grade === null ? r.passed : null,
+  attempt: r.attempt,
+  ects: r.ects,
+  weight: r.weight,
+  date: r.date,
+  title: r.title.slice(0, 120),
+});
+
+const deadlineRow = (userId: string, d: Deadline) => ({
+  id: d.id,
+  user_id: userId,
+  title: d.title.slice(0, 120),
+  date: d.date,
+  kind: d.kind,
+  done: d.done,
+  remind_days: d.remindDays,
+});
+
+const eventRow = (userId: string, e: StudyEvent) => ({
+  id: e.id,
+  user_id: userId,
+  subject_id: e.subjectId,
+  kind: e.kind,
+  title: e.title.slice(0, 160),
+  room: e.room.slice(0, 120),
+  lecturer: e.lecturer.slice(0, 120),
+  weekday: e.weekday,
+  date: e.date,
+  start_min: e.startMin,
+  end_min: e.endMin,
+  every: e.every,
+  valid_from: e.validFrom,
+  valid_to: e.validTo,
+  skipped: e.skipped.slice(0, 400),
+  uid: e.uid ? e.uid.slice(0, 300) : null,
 });
 
 const taskRow = (userId: string, t: Task) => ({
@@ -238,6 +296,7 @@ const SYNC_TABLES = [
   'profiles', 'subjects', 'exams', 'plan_settings', 'timer_settings', 'focus_sessions', 'tasks',
   'daily_checkins', 'day_overrides', 'exam_topics', 'lanis_snapshots', 'fitness_daily', 'lesson_notes', 'flashcards',
   'exam_reviews', 'subject_rubrics', 'practice_exams', 'abitur_plans', 'grades', 'grade_settings', 'task_styles', 'accounts',
+  'study_settings', 'module_results', 'deadlines', 'events',
 ] as const;
 
 /**
@@ -268,7 +327,7 @@ export async function loadRemote(
   defaults: RemoteData,
   local: AppState | null,
 ): Promise<{ data: RemoteData; imported: boolean }> {
-  const [p, s, e, pl, ts, f, k, ci, fi, ov, tp, ls, ln, fc, er, sr, pe, ap, ts2, acc, gr, gs] = await Promise.all([
+  const [p, s, e, pl, ts, f, k, ci, fi, ov, tp, ls, ln, fc, er, sr, pe, ap, ts2, acc, gr, gs, st, mr, dl, ev] = await Promise.all([
     supabase.from('profiles').select('*').eq('user_id', userId).maybeSingle(),
     supabase.from('subjects').select('*'),
     supabase.from('exams').select('*'),
@@ -295,6 +354,11 @@ export async function loadRemote(
     supabase.from('accounts').select('status, is_admin, ai_features').eq('user_id', userId).maybeSingle(),
     supabase.from('grades').select('*').order('date', { ascending: false }),
     supabase.from('grade_settings').select('data').eq('user_id', userId).maybeSingle(),
+    // Studium (Migration 20261103): fehlt sie noch, startet die App trotzdem (ohne Studiendaten)
+    supabase.from('study_settings').select('data').eq('user_id', userId).maybeSingle(),
+    supabase.from('module_results').select('*').order('date'),
+    supabase.from('deadlines').select('*').order('date'),
+    supabase.from('events').select('*').order('created_at'),
   ]);
   for (const r of [p, s, e, pl, ts, f, k]) ok(r);
 
@@ -326,6 +390,11 @@ export async function loadRemote(
       points: r.points,
       difficulty: r.difficulty,
       language: isLanguage(r.language) ? r.language : 'de',
+      scope: (r.scope === 'uni' ? 'uni' : 'school') as Scope,
+      ects: r.ects === null || r.ects === undefined ? null : Number(r.ects),
+      semester: typeof r.semester === 'number' ? r.semester : null,
+      required: r.required !== false,
+      lecturer: typeof r.lecturer === 'string' ? r.lecturer : '',
     })),
     exams: (e.data ?? []).map((r) => ({
       id: r.id,
@@ -339,6 +408,17 @@ export async function loadRemote(
       lanisDate: r.lanis_date ?? null,
       lanisNotice: r.lanis_notice ?? null,
       lanisAck: r.lanis_ack ?? null,
+      // Studium: nur setzen, wenn die Spalten da sind (Migration 20261103)
+      ...(typeof r.kind === 'string'
+        ? {
+            kind: isExamKind(r.kind) ? r.kind : 'written',
+            attempt: typeof r.attempt === 'number' ? r.attempt : 1,
+            freeAttempt: r.free_attempt === true,
+            registerBy: typeof r.register_by === 'string' ? r.register_by : null,
+            withdrawBy: typeof r.withdraw_by === 'string' ? r.withdraw_by : null,
+            graded: r.graded !== false,
+          }
+        : {}),
     })),
     plan: pl.data
       ? { freeDaysPerWeek: pl.data.free_days_per_week as 0 | 1 | 2, dailyLimitMin: pl.data.daily_limit_min }
@@ -410,6 +490,49 @@ export async function loadRemote(
       ];
     }),
     gradeSettings: gs.error ? readGradeSettings(null) : readGradeSettings(gs.data?.data),
+    study: st.error ? readStudyProfile(null) : readStudyProfile(st.data?.data),
+    results: (mr.error ? [] : mr.data ?? []).map(
+      (r): ModuleResult => ({
+        id: r.id,
+        subjectId: r.subject_id,
+        examId: typeof r.exam_id === 'string' ? r.exam_id : null,
+        grade: r.grade === null || r.grade === undefined ? null : Number(r.grade),
+        passed: typeof r.passed === 'boolean' ? r.passed : null,
+        attempt: typeof r.attempt === 'number' ? r.attempt : 1,
+        ects: Number(r.ects) || 0,
+        weight: Number(r.weight) || 0,
+        date: r.date,
+        title: typeof r.title === 'string' ? r.title : '',
+      }),
+    ),
+    deadlines: (dl.error ? [] : dl.data ?? []).flatMap((r): Deadline[] =>
+      isDeadlineKind(r.kind)
+        ? [{ id: r.id, title: r.title, date: r.date, kind: r.kind, done: r.done === true, remindDays: typeof r.remind_days === 'number' ? r.remind_days : 7 }]
+        : [],
+    ),
+    events: (ev.error ? [] : ev.data ?? []).flatMap((r): StudyEvent[] =>
+      isEventKind(r.kind)
+        ? [
+            {
+              id: r.id,
+              subjectId: typeof r.subject_id === 'string' ? r.subject_id : null,
+              kind: r.kind,
+              title: r.title ?? '',
+              room: r.room ?? '',
+              lecturer: r.lecturer ?? '',
+              weekday: typeof r.weekday === 'number' ? r.weekday : null,
+              date: typeof r.date === 'string' ? r.date : null,
+              startMin: r.start_min,
+              endMin: r.end_min,
+              every: r.every === 2 ? 2 : 1,
+              validFrom: typeof r.valid_from === 'string' ? r.valid_from : null,
+              validTo: typeof r.valid_to === 'string' ? r.valid_to : null,
+              skipped: Array.isArray(r.skipped) ? (r.skipped as unknown[]).filter((x): x is string => typeof x === 'string') : [],
+              uid: typeof r.uid === 'string' ? r.uid : null,
+            },
+          ]
+        : [],
+    ),
     account,
     taskStyles: (ts2.error ? [] : ts2.data ?? []).map(
       (r): StyleRecord => ({
@@ -549,6 +672,10 @@ export function pickRemote(s: AppState): RemoteData {
     grades: s.grades,
     gradeSettings: s.gradeSettings,
     taskStyles: s.taskStyles,
+    study: s.study,
+    results: s.results,
+    deadlines: s.deadlines,
+    events: s.events,
     account: s.account,
   };
 }
@@ -640,6 +767,25 @@ export async function persist(action: Action, next: AppState, userId: string): P
       return;
     case 'setGradeSettings':
       return upsert('grade_settings', { user_id: userId, data: action.settings, updated_at: new Date().toISOString() }, 'user_id');
+    case 'setStudy':
+      return upsert('study_settings', { user_id: userId, data: action.study, updated_at: new Date().toISOString() }, 'user_id');
+    case 'upsertResult':
+      return upsert('module_results', resultRow(userId, action.result));
+    case 'deleteResult':
+      ok(await supabase.from('module_results').delete().eq('id', action.id));
+      return;
+    case 'upsertDeadline':
+      return upsert('deadlines', deadlineRow(userId, action.deadline));
+    case 'deleteDeadline':
+      ok(await supabase.from('deadlines').delete().eq('id', action.id));
+      return;
+    case 'upsertEvents':
+      // in Päckchen, damit die Anfrage nicht zu groß wird
+      for (let i = 0; i < action.events.length; i += 100) await upsert('events', action.events.slice(i, i + 100).map((e) => eventRow(userId, e)));
+      return;
+    case 'deleteEvents':
+      for (let i = 0; i < action.ids.length; i += 100) ok(await supabase.from('events').delete().in('id', action.ids.slice(i, i + 100)));
+      return;
     case 'upsertRubric':
       return upsert('subject_rubrics', rubricRow(userId, action.rubric), 'user_id,subject_id');
     case 'addTopic':
@@ -680,6 +826,7 @@ export async function persist(action: Action, next: AppState, userId: string): P
       await supabase.from('abitur_plans').delete().eq('user_id', userId);
       await supabase.from('grades').delete().eq('user_id', userId);
       await supabase.from('grade_settings').delete().eq('user_id', userId);
+      for (const table of ['study_settings', 'module_results', 'deadlines', 'events']) await supabase.from(table).delete().eq('user_id', userId);
       await supabase.from('task_styles').delete().eq('user_id', userId);
       await supabase.from('flashcards').delete().eq('user_id', userId);
       await supabase.from('lesson_notes').delete().eq('user_id', userId);

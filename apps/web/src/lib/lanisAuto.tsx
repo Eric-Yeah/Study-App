@@ -149,7 +149,7 @@ function base64ToBytes(b64: string): Uint8Array<ArrayBuffer> {
 const Ctx = createContext<LanisAutoApi | null>(null);
 
 export function LanisAutoProvider({ children }: { children: ReactNode }) {
-  const { state, dispatch } = useStore();
+  const { state, dispatch, mode } = useStore();
   const userId = useUserId();
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -402,7 +402,7 @@ export function LanisAutoProvider({ children }: { children: ReactNode }) {
 
   // Beim Start und wenn die App wieder in den Vordergrund kommt.
   useEffect(() => {
-    if (!enabled && !dsbEnabled) return;
+    if (mode === 'university' || (!enabled && !dsbEnabled)) return; // im Studium ruft die App weder Lanis noch DSBmobile ab
     const first = window.setTimeout(() => void refresh(), 2500);
     const onVisible = () => document.visibilityState === 'visible' && void refresh();
     document.addEventListener('visibilitychange', onVisible);
@@ -415,7 +415,7 @@ export function LanisAutoProvider({ children }: { children: ReactNode }) {
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('online', onVisible);
     };
-  }, [enabled, dsbEnabled, refresh]);
+  }, [enabled, dsbEnabled, mode, refresh]);
 
   const value = useMemo(
     () => ({ enabled, busy, error, lastAt, enable, disable, refresh, downloadFiles, dsbEnabled, dsbError, enableDsb, disableDsb, dsbAt, dsbStand }),

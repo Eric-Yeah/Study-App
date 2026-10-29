@@ -1,7 +1,8 @@
-import { CONFIG, emptyPlan, type HomeworkSnapshot, type AbsenceReport, pendingAccess, type AccountAccess, type StyleRecord, type AbiturPlan, emptyGradeSettings, type GradeEntry, type GradeSettings, type ExamReview, type PracticeRecord, type SubjectRubric, type Flashcard, type Quarter, type Exam, type PlanSettings, type Role, type Stage, type Subject, type SubstitutionEntry, type Timetable, type Effort, type Legibility, type WorksheetSummary } from '@study/core';
+import { CONFIG, emptyPlan, emptyStudyProfile, type AppMode, type Deadline, type ModuleResult, type StudyEvent, type StudyProfile, type HomeworkSnapshot, type AbsenceReport, pendingAccess, type AccountAccess, type StyleRecord, type AbiturPlan, emptyGradeSettings, type GradeEntry, type GradeSettings, type ExamReview, type PracticeRecord, type SubjectRubric, type Flashcard, type Quarter, type Exam, type PlanSettings, type Role, type Stage, type Subject, type SubstitutionEntry, type Timetable, type Effort, type Legibility, type WorksheetSummary } from '@study/core';
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
 import { SplashScreen } from '../components/SplashScreen';
 import { loadRemote, persist, pickRemote, subscribeChanges, type RemoteData } from './remote';
+import { modeOf, scopeState } from './scope';
 
 /**
  * App-Zustand. Die Daten liegen in Supabase (pro Konto). Der Reducer bleibt die einzige Stelle,
@@ -140,6 +141,10 @@ export interface AppState {
   gradeSettings: GradeSettings; // Anteil der Klausuren an der Kursnote je Fach
   taskStyles: StyleRecord[]; // gelernter Stil der echten Aufgabenblätter, pro Fach und Lehrkraft
   account: AccountAccess; // Freigabe, Admin, freigeschaltete KI-Funktionen (nur lesen, ändert der Admin)
+  study: StudyProfile; // Studium: Studiengang, Startsemester, Semesterzeiten
+  results: ModuleResult[]; // Studium: Ergebnisse der Prüfungen (Note 1,0 bis 5,0, Versuch, ECTS)
+  deadlines: Deadline[]; // Studium: Rückmeldung, Anmeldung, BAföG, Abgaben
+  events: StudyEvent[]; // Studium: Stundenplan mit freier Uhrzeit
 }
 
 const LEGACY_STORAGE_KEY = 'study-app-state-v1'; // Daten aus der Zeit vor Supabase
@@ -183,6 +188,10 @@ export const initialState: AppState = {
   gradeSettings: emptyGradeSettings(),
   taskStyles: [],
   account: pendingAccess(),
+  study: emptyStudyProfile(),
+  results: [],
+  deadlines: [],
+  events: [],
 };
 
 export type Action =
@@ -217,6 +226,13 @@ export type Action =
   | { type: 'upsertGrade'; grade: GradeEntry }
   | { type: 'deleteGrade'; id: string }
   | { type: 'setGradeSettings'; settings: GradeSettings }
+  | { type: 'setStudy'; study: StudyProfile }
+  | { type: 'upsertResult'; result: ModuleResult }
+  | { type: 'deleteResult'; id: string }
+  | { type: 'upsertDeadline'; deadline: Deadline }
+  | { type: 'deleteDeadline'; id: string }
+  | { type: 'upsertEvents'; events: StudyEvent[] }
+  | { type: 'deleteEvents'; ids: string[] }
   | { type: 'upsertStyle'; style: StyleRecord }
   | { type: 'deleteStyle'; id: string }
   | { type: 'upsertPractice'; practice: PracticeRecord }
@@ -263,6 +279,8 @@ export function reducer(state: AppState, action: Action): AppState {
         notes: state.notes.map((n) => (n.subjectId === action.id ? { ...n, subjectId: null } : n)),
         cards: state.cards.map((c) => (c.subjectId === action.id ? { ...c, subjectId: null } : c)),
         taskStyles: state.taskStyles.filter((t) => t.subjectId !== action.id),
+        results: state.results.filter((r) => r.subjectId !== action.id),
+        events: state.events.map((e) => (e.subjectId === action.id ? { ...e, subjectId: null } : e)),
       };
     case 'upsertExam':
       return { ...state, exams: upsert(state.exams, action.exam) };
@@ -272,6 +290,7 @@ export function reducer(state: AppState, action: Action): AppState {
         exams: state.exams.filter((e) => e.id !== action.id),
         topics: state.topics.filter((t) => t.examId !== action.id),
         grades: state.grades.map((g) => (g.examId === action.id ? { ...g, examId: null } : g)), // die Note bleibt, nur die Verknüpfung fällt weg
+        results: state.results.map((r) => (r.examId === action.id ? { ...r, examId: null } : r)),
       };
     case 'setPlan':
       return { ...state, plan: { ...state.plan, ...action.plan } };
@@ -340,6 +359,22 @@ export function reducer(state: AppState, action: Action): AppState {
       return { ...state, grades: state.grades.filter((g) => g.id !== action.id) };
     case 'setGradeSettings':
       return { ...state, gradeSettings: action.settings };
+    case 'setStudy':
+      return { ...state, study: action.study };
+    case 'upsertResult':
+      return { ...state, results: upsert(state.results, action.result) };
+    case 'deleteResult':
+      return { ...state, results: state.results.filter((r) => r.id !== action.id) };
+    case 'upsertDeadline':
+      return { ...state, deadlines: upsert(state.deadlines, action.deadline) };
+    case 'deleteDeadline':
+      return { ...state, deadlines: state.deadlines.filter((d) => d.id !== action.id) };
+    case 'upsertEvents':
+      return { ...state, events: action.events.reduce((list, e) => upsert(list, e), state.events) };
+    case 'deleteEvents': {
+      const gone = new Set(action.ids);
+      return { ...state, events: state.events.filter((e) => !gone.has(e.id)) };
+    }
     case 'upsertStyle':
       return { ...state, taskStyles: upsert(state.taskStyles, action.style) };
     case 'deleteStyle':
@@ -389,7 +424,11 @@ function loadLegacy(): AppState | null {
 }
 
 interface StoreApi {
+  /** Ansicht für den eingestellten Modus: Fächer des anderen Modus (Schule oder Studium) und ihre Daten sind verborgen. */
   state: AppState;
+  /** Der Zustand mit allen Daten beider Modi (zum Beispiel für das Umschalten). */
+  full: AppState;
+  mode: AppMode;
   dispatch: (action: Action) => void;
   /** Letzter Fehler beim Speichern oder Laden, null wenn alles synchron ist. */
   syncError: string | null;
@@ -540,7 +579,12 @@ export function StoreProvider({ userId, children }: { userId: string; children: 
 
   const refresh = useCallback(() => refetchFn.current(), []);
   const flush = useCallback(() => queue.current, []);
-  const value = useMemo(() => ({ state, dispatch, syncError, sync, refresh, flush }), [state, dispatch, syncError, sync, refresh, flush]);
+  const view = useMemo(() => scopeState(state), [state]);
+  const mode = modeOf(state);
+  const value = useMemo(
+    () => ({ state: view, full: state, mode, dispatch, syncError, sync, refresh, flush }),
+    [view, state, mode, dispatch, syncError, sync, refresh, flush],
+  );
 
   if (status === 'loading') return <SplashScreen label="Lade deine Daten …" />;
   if (status === 'error') {

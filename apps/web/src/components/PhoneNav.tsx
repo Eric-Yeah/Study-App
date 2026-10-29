@@ -1,7 +1,8 @@
 import { ChevronRight } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { MORE_ICON, PHONE_BAR_AREAS, PHONE_MORE_AREAS, locate, phoneSlot } from '../nav';
+import { useMode } from '../lib/mode';
+import { MORE_ICON, locate, phoneBarAreasFor, phoneMoreAreasFor, phoneSlot } from '../nav';
 import { useVisibleTabs } from './SectionTabs';
 
 /**
@@ -12,7 +13,8 @@ import { useVisibleTabs } from './SectionTabs';
 export function PhoneNav() {
   const { pathname } = useLocation();
   const { area, tab } = locate(pathname);
-  const slot = phoneSlot(area);
+  const { mode } = useMode();
+  const slot = phoneSlot(area, mode);
   const visibleTabs = useVisibleTabs();
   const [open, setOpen] = useState(false);
   const button = useRef<HTMLButtonElement>(null);
@@ -42,7 +44,7 @@ export function PhoneNav() {
           <div className="more-backdrop" onClick={() => setOpen(false)} aria-hidden="true" />
           <div id="more-menu" className="more-sheet" role="dialog" aria-label="Mehr">
             <ul className="more-list">
-              {PHONE_MORE_AREAS.map((a, i) => {
+              {phoneMoreAreasFor(mode).map((a, i) => {
                 const here = a.id === area;
                 const extra = visibleTabs(a.tabs ?? [], here ? tab : null).filter((t) => t.to !== a.to);
                 return (
@@ -76,7 +78,7 @@ export function PhoneNav() {
         </>
       )}
       <nav className="bottom-nav" aria-label="Hauptnavigation">
-        {PHONE_BAR_AREAS.map(({ id, to, label, icon: Icon }) => (
+        {phoneBarAreasFor(mode).map(({ id, to, label, icon: Icon }) => (
           <Link key={id} to={to} aria-current={slot === id ? 'page' : undefined} className={`nav-link${active === id ? ' active' : ''}`}>
             <span className="nav-icon">
               <Icon size={22} aria-hidden="true" />
